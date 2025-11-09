@@ -39,6 +39,16 @@ def fmt_str_file(
     return filename[0:max_char]
 
 
+def get_column_values(df: pd.DataFrame, col: str) -> ArrayString:
+    try:
+        _values = df[col].astype('str').values.tolist()
+    except Exception as e:
+        print(e)
+        return ArrayString([])
+    else:
+        return ArrayString(_values)
+
+
 class OriginFileName(sp.File):
 
     def __init__(self, filename: str):
@@ -55,46 +65,51 @@ class FilterText(object):
     """
         Padrão de informações a serem filtradas em um documento.
     """
+
     def __init__(
-                self,
-                find_txt: str,
-                out_dir: sp.Directory, *,
-                separator: str = ' ',
-                case: bool = False,
-                iqual: bool = False,
-                key_filter: str = None,
-            ):
+            self,
+            find_txt: str,
+            out_dir: sp.Directory, *,
+            separator: str = ' ',
+            case: bool = False,
+            iqual: bool = False,
+            key_filter: str = None,
+            save_tables: bool = True,
+    ):
         self.find_txt: str = find_txt
         self.out_dir: sp.Directory = out_dir
         self.case: bool = case
         self.iqual: bool = iqual
         self.separator: str = separator
         self.key_filter: str = key_filter
+        self.save_tables: bool = save_tables
 
 
 class FilterData(FilterText):
 
     def __init__(
-                self,
-                src_df: pd.DataFrame, *,
-                out_dir: sp.Directory,
-                col_find: str,
-                col_new_name: str,
-                cols_in_name: list[str],
-                find_txt: str = 'nan',
-                separator: str = ' ',
-                case: bool = False,
-                iqual: bool = False,
-                key_filter: str = None
-            ):
+            self,
+            src_df: pd.DataFrame,
+            out_dir: sp.Directory, *,
+            col_find: str,
+            col_new_name: str,
+            cols_in_name: list[str],
+            separator: str = ' ',
+            case: bool = False,
+            iqual: bool = False,
+            key_filter: str = None,
+            find_txt: str = 'nan',
+            save_tables: bool = True
+    ):
         super().__init__(
-                find_txt,
-                out_dir,
-                separator=separator,
-                case=case,
-                iqual=iqual,
-                key_filter=key_filter
-            )
+            find_txt,
+            out_dir,
+            separator=separator,
+            case=case,
+            iqual=iqual,
+            key_filter=key_filter,
+            save_tables=save_tables
+        )
         self.col_find: str = col_find
         self.col_new_name: str = col_new_name
         self.cols_in_name: list[str] = cols_in_name
@@ -102,7 +117,6 @@ class FilterData(FilterText):
 
 
 class SearchableText(object):
-
     default_elements: cs.DictTextTable = cs.DictTextTable.create_void_dict()
     default_columns: HeadValues = HeadValues([HeadCell(x) for x in list(default_elements.keys())])
 
@@ -227,11 +241,11 @@ class NameFinder(object):
         self._col_include_filter: str = HeadCell('FILTRO ADICIONAL')
 
     def get_new_name(
-                self,
-                tb: TableDocuments, *,
-                max_char: int = 90,
-                upper_case: bool = True,
-            ) -> dict[OriginFileName, DestFileName]:
+            self,
+            tb: TableDocuments, *,
+            max_char: int = 90,
+            upper_case: bool = True,
+    ) -> dict[OriginFileName, DestFileName]:
         pass
 
 
@@ -241,11 +255,11 @@ class NameFinderInnerText(NameFinder):
         super().__init__(filter_text)
 
     def get_new_name(
-                self,
-                tb: TableDocuments, *,
-                max_char: int = 90,
-                upper_case: bool = True,
-            ) -> dict[OriginFileName, DestFileName]:
+            self,
+            tb: TableDocuments, *,
+            max_char: int = 90,
+            upper_case: bool = True,
+    ) -> dict[OriginFileName, DestFileName]:
         list_new_names: ListString = ListString([])
         tb_txt_file: pd.DataFrame = pd.DataFrame.from_dict(tb)
         df = tb_txt_file[[ColumnsTable.TEXT, ColumnsTable.FILE_PATH]].astype('str')
@@ -312,6 +326,32 @@ class NameFinderInnerData(NameFinder):
         super().__init__(filter_text)
         self.filter_data: FilterData = filter_text
 
+    def get_values(self, df: pd.DataFrame, col: str) -> ArrayString:
+        return get_column_values(df, col)
+
+    def get_include_names(self, idx: int) -> str | None:
+        if len(self.filter_data.cols_in_name) == 0:
+            return None
+
+        values = ArrayString([])
+        for col in self.filter_data.cols_in_name:
+            try:
+                current_text = self.filter_data.src_df[col].astype('str').values.tolist()[idx]
+            except Exception as e:
+                pass
+            else:
+                if (current_text == 'nan') or (current_text == 'NaN') \
+                        or (current_text == 'NaD') or (current_text == 'NaT') \
+                        or (current_text == '') or (current_text is None) or (current_text == 'None'):
+                    continue
+                values.append(current_text)
+        if values.length == 0:
+            return None
+        new_name = ''
+        for i in values:
+            new_name = f'{new_name}-{i}'
+        return new_name
+
     def get_new_name(
                 self,
                 tb: TableDocuments, *,
@@ -319,33 +359,27 @@ class NameFinderInnerData(NameFinder):
                 upper_case: bool = True,
             ) -> dict[OriginFileName, DestFileName]:
         # Lista de valores da coluna texto.
-        list_values_find: list[str] = self.filter_data.src_df[self.filter_data.col_find].astype('str').values.tolist()
+        list_values_find: ArrayString = self.get_values(self.filter_data.src_df, self.filter_data.col_find)
         # Lista de valores da coluna com novos nomes de arquivo.
-        content_new_names: list[str] = self.filter_data.src_df[self.filter_data.col_new_name].astype('str').values.tolist()
+        content_new_names: ArrayString = self.get_values(self.filter_data.src_df, self.filter_data.col_new_name)
         # Lista de valores com as linhas de texto do arquivo em formato list[str].
         lines_in_doc: ArrayString = ArrayString(tb.get_column(ColumnsTable.TEXT))
-        # Lista das colunas/texto a serem acrescentados no nome do novo arquivo.
-        cols_include_names: list[list[str]] = []
-
-        if len(self.filter_data.cols_in_name) > 0:
-            for c in self.filter_data.cols_in_name:
-                values_include: list[str] = self.filter_data.src_df[c].astype('str').values.tolist()
-                cols_include_names.append(values_include)
 
         line_df: str
         idx_df: int
         output_name: str = None
         for idx_df, line_df in enumerate(list_values_find):
-            if not lines_in_doc.contains(line_df, case=False):
+            if not lines_in_doc.contains(line_df, case=False, iqual=False):
                 continue
 
             output_name = content_new_names[idx_df]
-            if len(self.filter_data.cols_in_name) > 0:
-                include_strings = ''
-                element: list[str]
-                for element in cols_include_names:
-                    include_strings = f'{include_strings}-{element[idx_df]}'
+            if (output_name == 'nan') or (output_name is None):
+                output_name = ''
+            include_strings = self.get_include_names(idx_df)
+            if include_strings is not None:
                 output_name = f'{output_name}-{include_strings}'
+            if output_name == '':
+                continue
             output_name: str = fmt_str_file(output_name, max_char=max_char, upper_case=upper_case)
             break
 
@@ -364,5 +398,4 @@ class NameFinderInnerData(NameFinder):
             return {}
         _dest = DestFileName(_dest_path.absolute())
         _origin = OriginFileName(_origin_path.absolute())
-        print(f'{__class__.__name__} Ocorrência encontrada: {_dest_path.basename()}')
         return {_origin: _dest}

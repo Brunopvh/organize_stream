@@ -136,9 +136,7 @@ def read_document(
                 current_tb, name=sheet.ColumnsTable.NUM_PAGE, new_value=f'{page_pdf_idx+1}'
             )
             list_tables.append(current_tb)
-    print()
     pbar.update(100, 'Extração finalizada!')
-    print()
     pbar.stop()
     return concat_tables(list_tables)
 

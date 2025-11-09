@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#from __future__ import annotations
+
 from sheet_stream import TableDocuments
 from organize_stream.read import read_image, read_document, Ocr
 from organize_stream.type_utils.observer import NotifyProvider
@@ -106,4 +106,7 @@ class DocumentTextExtract(NotifyProvider):
         return pd.concat(_data).astype('str')
 
     def to_excel(self, file: sp.File) -> None:
-        self.to_data().to_excel(file.absolute(), index=False)
+        try:
+            self.to_data().to_excel(file.absolute(), index=False)
+        except Exception as e:
+            print(f'Error: {e}')

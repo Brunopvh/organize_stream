@@ -8,7 +8,7 @@ from organize_stream.find import (
 from organize_stream.read import create_tb_from_names
 from organize_stream.type_utils.observer import Observer
 from organize_stream.document.text_extract import DocumentTextExtract
-from sheet_stream import TableDocuments
+from sheet_stream import TableDocuments, ColumnsTable
 import soup_files as sp
 import convert_stream as cs
 import shutil
@@ -81,6 +81,10 @@ class Organize(Observer):
         self.max_char: int = 90
         self.upper_case: bool = True
 
+    @property
+    def output_dir_tables(self) -> sp.Directory:
+        return self.filter_text.out_dir.concat('Tabelas', create=True)
+
     def _show_error(self, txt: str):
         print()
         self.pbar.update_text(f'{__class__.__name__} {txt}')
@@ -103,25 +107,42 @@ class Organize(Observer):
                 f'[ADICIONANDO IMAGEM] {n + 1}/{total} {image.metadata.name}'
             )
             self.add_image(image)
+        self.export_final_table()
 
     def add_document(
-            self,
-            document: cs.DocumentPdf, *,
-            apply_ocr: bool = True,
-            dpi: int = 200
-    ):
+                self,
+                document: cs.DocumentPdf, *,
+                apply_ocr: bool = True,
+                dpi: int = 200
+            ):
         self.extractor.add_document(document, apply_ocr=apply_ocr, dpi=dpi)
 
     def add_dir_pdf(
-            self,
-            path: sp.Directory, *,
-            apply_ocr: bool = True,
-            dpi: int = 200
-    ):
+                self,
+                path: sp.Directory, *,
+                apply_ocr: bool = True,
+                dpi: int = 200
+            ):
         self.extractor.add_directory_pdf(path, apply_ocr=apply_ocr, dpi=dpi)
+        self.export_final_table()
 
     def add_dir_image(self, path: sp.Directory):
         self.extractor.add_directory_image(path)
+        self.export_final_table()
+
+    def export_tables(self, tb: TableDocuments) -> None:
+        if not self.filter_text.save_tables:
+            return
+        origin_name = tb.get_column(ColumnsTable.FILE_NAME)[0]
+        output_path = self.output_dir_tables.join_file(f'{origin_name}.xlsx')
+        if isinstance(output_path, sp.File):
+            #print(f'DEBUG: Exportando ... {output_path.basename()}')
+            tb.to_data().to_excel(output_path.absolute(), index=False)
+
+    def export_final_table(self):
+        if not self.filter_text.save_tables:
+            return
+        self.extractor.to_excel(self.output_dir_tables.join_file('data.xlsx'))
 
     def receive_notify(self, notify: TableDocuments) -> None:
         pass
@@ -141,11 +162,12 @@ class OrganizeInnerText(Organize):
         super().__init__(filter_text)
         self.name_finder: NameFinderInnerText = NameFinderInnerText(self.filter_text)
 
-    def receive_notify(self, notify: cs.DictTextTable) -> None:
+    def receive_notify(self, notify: TableDocuments) -> None:
         self._count += 1
         self.move_where_contains_text(notify)
+        self.export_tables(notify)
 
-    def move_where_contains_text(self, tb: cs.DictTextTable) -> None:
+    def move_where_contains_text(self, tb: TableDocuments) -> None:
         """
         Mover/Renomear arquivos de acordo com padrões de texto presentes
         nos documentos/imagens.
@@ -170,11 +192,12 @@ class OrganizeInnerData(Organize):
         self.filter_data: FilterData = filter_data
         self.name_inner_data: NameFinderInnerData = NameFinderInnerData(self.filter_data)
 
-    def receive_notify(self, notify: cs.DictTextTable) -> None:
+    def receive_notify(self, notify: TableDocuments) -> None:
         self._count += 1
         self.move_where_math_column(notify)
+        self.export_tables(notify)
 
-    def move_where_math_column(self, tb: cs.DictTextTable) -> None:
+    def move_where_math_column(self, tb: TableDocuments) -> None:
         """
             Mover arquivos conforme as ocorrências de texto encontradas na tabela/DataFrame df.
         o nome do novo arquivo será igual à ocorrência de texto da coluna 'col_find', podendo
@@ -219,7 +242,7 @@ class OrganizeInnerData(Organize):
         banana-Cidade 2-yyxxx (se incluir cols_in_name=['B', 'C']).
 
         """
-        values: list[cs.DictTextTable] = create_tb_from_names(files)
+        values: list[TableDocuments] = create_tb_from_names(files)
         for current_tb in values:
             mv_items = self.name_inner_data.get_new_name(
                 current_tb, max_char=self.max_char, upper_case=self.upper_case

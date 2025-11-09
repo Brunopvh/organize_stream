@@ -10,7 +10,7 @@ import organize_stream as org
 from soup_files import *
 import pandas as pd
 import convert_stream as cs
-from sheet_stream import save_data
+from sheet_stream import save_data, ReadFileSheet, fmt_col_to_date, LibDate
 
 DOW = UserFileSystem().userDownloads
 OUT = DOW.concat('output', create=True)
@@ -20,11 +20,20 @@ dest = OUT.concat('MOVIDOS', create=True)
 def test():
 
     output_sheet = OUT.join_file('teste-ext.xlsx')
-    src_dir = Directory('/mnt/hd_dados/2025-11-03 CARTAS TOI WHATSAPP/OcrCartas/EXTREMA/107 Ago 2024 - 10 Set 2025/Origin')
+    src_sheet = File('/home/brunoc/Documentos/BASE/base-gm.xlsx')
+    src_dir = Directory('/mnt/dados/Teste')
+    input_files = InputFiles(src_dir)
+    files = input_files.get_files(file_type=LibraryDocs.PDF)[0:3]
 
-    fil = org.FilterText('TOI', dest)
-    fd = org.OrganizeInnerText(fil)
-    fd.add_dir_pdf(src_dir)
+    for f in files:
+        tb = org.read_document(cs.DocumentPdf(f))
+        if tb.length == 0:
+            continue
+            
+        carta = org.CartaCalculo(tb)
+        org.cartas.move_cartas([carta], dest)
+
+
 
 
 def main():
