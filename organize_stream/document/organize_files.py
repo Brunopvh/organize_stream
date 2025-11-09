@@ -2,12 +2,13 @@
 from __future__ import annotations
 from typing import Union
 from organize_stream.find import (
-    NameFinderInnerText, NameFinderInnerData, NameFinder, FilterText,
+    NameFinderInnerText, NameFinderInnerData, FilterText,
     FilterData, OriginFileName, DestFileName
 )
 from organize_stream.read import create_tb_from_names
-from organize_stream.document.observer import Observer
+from organize_stream.type_utils.observer import Observer
 from organize_stream.document.text_extract import DocumentTextExtract
+from sheet_stream import TableDocuments
 import soup_files as sp
 import convert_stream as cs
 import shutil
@@ -122,7 +123,7 @@ class Organize(Observer):
     def add_dir_image(self, path: sp.Directory):
         self.extractor.add_directory_image(path)
 
-    def receive_notify(self, notify: cs.TextTable) -> None:
+    def receive_notify(self, notify: TableDocuments) -> None:
         pass
 
 
@@ -162,9 +163,6 @@ class OrganizeInnerData(Organize):
 
     def __init__(self, filter_data: FilterData):
         """
-        :param df: DataFrame com os dados de uma tabela/DataFrame, onde cada linha de determinada
-        coluna será comparada com os textos presentes nos documentos.
-
         :param filter_data: FilterData com os nomes das colunas onde será buscado os textos a serem
         filtrados linha a linha.
         """

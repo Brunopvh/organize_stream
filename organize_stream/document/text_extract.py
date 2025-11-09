@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 #from __future__ import annotations
-from organize_stream.read import read_file_pdf, read_image
-from organize_stream.document.observer import NotifyProvider
+from sheet_stream import TableDocuments
+from organize_stream.read import read_image, read_document, Ocr
+from organize_stream.type_utils.observer import NotifyProvider
 import soup_files as sp
 import convert_stream as cs
 import ocr_stream as ocr
@@ -13,37 +14,38 @@ class DocumentTextExtract(NotifyProvider):
         Extrair texto de arquivos, e converter em Excel/DataFrame
     """
 
-    def __init__(self, recoginze: ocr.RecognizePdf = ocr.RecognizePdf()):
+    def __init__(self, recognize_image: ocr.RecognizeImage = Ocr()):
         super().__init__()
-        self.tb_list: list[cs.DictTextTable] = []
-        self.recognize: ocr.RecognizePdf = recoginze
-        self.threshold: bool = True
+        self.tb_list: list[TableDocuments] = []
+        self.recognize: ocr.RecognizeImage = recognize_image
+        self.threshold: bool = False
         self._count: int = 0
+        self._pbar = sp.ProgressBarAdapter()
 
     @property
     def pbar(self) -> sp.ProgressBarAdapter:
-        return self.recognize.pbar
+        return self._pbar
 
     @pbar.setter
     def pbar(self, pbar: sp.ProgressBarAdapter) -> None:
-        self.recognize.set_pbar(pbar)
+        self._pbar = pbar
 
     @property
     def is_empty(self) -> bool:
         return len(self.tb_list) == 0
 
-    def add_table(self, tb: cs.DictTextTable) -> None:
+    def add_table(self, tb: TableDocuments) -> None:
         self.tb_list.append(tb)
         self._count += 1
         self.pbar.update_text(f'{__class__.__name__} Tabela adicionada: {self._count}')
         self.send_notify(tb)
 
     def add_directory_pdf(
-            self,
-            dir_pdf: sp.Directory, *,
-            apply_ocr: bool = False,
-            dpi: int = 200
-    ):
+                self,
+                dir_pdf: sp.Directory, *,
+                apply_ocr: bool = False,
+                dpi: int = 200
+            ):
         files = sp.InputFiles(dir_pdf).get_files(file_type=sp.LibraryDocs.PDF)
         total = len(files)
         for n, f in enumerate(files):
@@ -51,7 +53,10 @@ class DocumentTextExtract(NotifyProvider):
                 ((n + 1) / total) * 100,
                 f'{n + 1}/{total} {f.basename()}',
             )
-            tb = read_file_pdf(f, apply_ocr=apply_ocr, pbar=self.pbar, dpi=dpi)
+            if apply_ocr:
+                tb = read_document(cs.DocumentPdf(f), self.recognize, pbar=self.pbar, dpi=dpi)
+            else:
+                tb = cs.DocumentPdf(f).to_dict()
             self.add_table(tb)
 
     def add_directory_image(self, dir_image: sp.Directory):
@@ -62,53 +67,33 @@ class DocumentTextExtract(NotifyProvider):
                 ((idx + 1) / total) * 100,
                 f'{idx + 1}/{total} {f.basename()}',
             )
-            # self.add_table(read_image(f))
             img = cs.ImageObject(f)
             if self.threshold:
                 img.set_threshold_gray()
-            self.add_table(read_image(img))
+            self.add_table(read_image(img, recognize=self.recognize))
 
-    def add_file_pdf(self, file_pdf: sp.File, apply_ocr: bool = False):
-        tb = read_file_pdf(file_pdf, pbar=self.pbar, apply_ocr=apply_ocr)
+    def add_file_pdf(self, file_pdf: sp.File, *, apply_ocr: bool = False, dpi: int = 200):
+        if apply_ocr:
+            tb = read_document(cs.DocumentPdf(file_pdf), self.recognize, pbar=self.pbar, dpi=dpi)
+        else:
+            tb = cs.DocumentPdf(file_pdf).to_dict()
         self.add_table(tb)
 
     def add_file_image(self, file_image: sp.File):
-        tb: cs.DictTextTable = read_image(file_image)
+        tb: TableDocuments = read_image(cs.ImageObject(file_image), recognize=self.recognize)
         self.add_table(tb)
 
     def add_image(self, image: cs.ImageObject):
         if not isinstance(image, cs.ImageObject):
             raise TypeError('Image must be an cs.ImageObject')
-        self.add_table(read_image(image))
+        self.add_table(read_image(image, recognize=self.recognize))
 
-    def add_document(
-            self, document:
-            cs.DocumentPdf, *,
-            apply_ocr: bool = False,
-            dpi: int = 200,
-    ):
+    def add_document(self, document: cs.DocumentPdf, *, apply_ocr: bool = False, dpi: int = 200,):
 
         if apply_ocr:
-            pages: list[cs.PageDocumentPdf] = []
-            _metadata = document.metadata
-            converter = cs.ConvertPdfToImages(document)
-            converter.set_pbar(self.pbar)
-            imgs = converter.to_images(dpi=dpi)
-            total = len(imgs)
-            for n, im in enumerate(imgs):
-                self.pbar.update(
-                    ((n + 1) / total) * 100,
-                    f'[OCR PDF] página {n + 1}/{total}'
-                )
-
-                if self.threshold:
-                    im.set_threshold_gray()
-                txt = self.recognize.recognize_image.image_recognize(im)
-                pages.append(txt.to_page_pdf())
-            print()
-            document = cs.DocumentPdf.create_from_pages(pages)
-            document.metadata = _metadata
-        tb = document.to_dict()
+            tb = read_document(document, self.recognize, pbar=self.pbar, dpi=dpi)
+        else:
+            tb = document.to_dict()
         self.add_table(tb)
 
     def to_data(self) -> pd.DataFrame:
@@ -116,9 +101,9 @@ class DocumentTextExtract(NotifyProvider):
             return cs.DictTextTable.create_void_df()
         _data: list[pd.DataFrame] = []
         for m in self.tb_list:
-            _data.append(pd.DataFrame.from_dict(m))
+            if m.length > 0:
+                _data.append(pd.DataFrame.from_dict(m))
         return pd.concat(_data).astype('str')
 
     def to_excel(self, file: sp.File) -> None:
         self.to_data().to_excel(file.absolute(), index=False)
-

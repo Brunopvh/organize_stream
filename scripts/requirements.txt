@@ -6,8 +6,10 @@ PyMuPDF
 reportlab
 opencv-python
 soup_files>=1.4
-convert_stream>=2.3.8
-ocr_stream>=2.3.8
+convert_stream>=2.4.3
+ocr_stream>=2.4.2
 scipy
+easyocr
+
 
 

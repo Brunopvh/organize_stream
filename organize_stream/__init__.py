@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-__version__ = '2.4'
+__version__ = '2.4.5'
 from .read import (
-    read_image, read_images, read_document_pdf, create_table_from_dict,
-    read_directory_pdf, read_directory_image, read_file_pdf, create_tb_from_names
+    read_image, read_document
 )
 from .find import (
     SearchableText, NameFinderInnerText, NameFinderInnerData, NameFinder,
