@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "organize_stream"
+version = "2.4"
+authors = [
+  { name="Bruno Chaves"},
+]
+
+description = "Organizar documentos PDF e imagens."
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "soup_files>=1.4",
+    "PyMuPDF",
+    "convert_stream>=2.4.1",
+    "ocr_stream>=2.4.1",
+    "pandas",
+    "opencv-python",
+]
+
+[tool.setuptools]
+packages = [
+    "organize_stream",
+    "organize_stream.document",
+    "organize_stream.read",
+    "organize_stream.find",
+]

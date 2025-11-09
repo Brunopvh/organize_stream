@@ -1,0 +1,3 @@
+
+class TableFileEmptyError(Exception):
+    pass
