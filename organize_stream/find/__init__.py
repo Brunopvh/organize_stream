@@ -399,3 +399,10 @@ class NameFinderInnerData(NameFinder):
         _dest = DestFileName(_dest_path.absolute())
         _origin = OriginFileName(_origin_path.absolute())
         return {_origin: _dest}
+
+
+class NameFinderInnerCarta(NameFinder):
+
+    def __init__(self, filter_text: FilterText):
+        super().__init__(filter_text)
+

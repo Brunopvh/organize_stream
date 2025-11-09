@@ -1,99 +1,11 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
-import convert_stream as cs
-import pandas as pd
 import shutil
 import soup_files as sp
-from organize_stream.erros import TableFileEmptyError
-from organize_stream.find import list_bad_chars, remove_bad_chars
-from sheet_stream.type_utils import concat_table_documents
+from organize_stream.type_utils import Carta
+from organize_stream.find import fmt_str_file, remove_bad_chars
 from sheet_stream import (
-    ListItems, ListString, ArrayString, ListColumnBody, TableDocuments, 
-    ColumnsTable, clean_string
+    ArrayString, ListColumnBody, TableDocuments,
 )
-
-
-class Carta(ABC):
-
-    def __init__(self, tb: TableDocuments):
-        self.tb: TableDocuments = tb
-        if self.tb.length == 0:
-            raise TableFileEmptyError('A tabela de arquivos não pode estar vazia!')
-        self._uniq_key_words = ArrayString([])
-
-    @property
-    def uniq_key_words(self) -> ArrayString:
-        return self._uniq_key_words
-
-    @property
-    def file_path_origin(self) -> sp.File | None:
-        value: ListColumnBody = self.tb.get_column(ColumnsTable.FILE_PATH)
-        if value.is_empty:
-            return None
-        if (value[0] == '') or (value[0] == 'nan') or (value[0] == 'None') \
-                or (value[0] == '-') or (value[0] == 'NaT'):
-            return None
-        try:
-            file_path = sp.File(value[0])
-        except Exception as e:
-            print(e)
-            return None
-        else:
-            if file_path.path.exists():
-                return file_path
-            return None
-
-    @property
-    def dir_path_origin(self) -> sp.Directory | None:
-        value: ListColumnBody = self.tb.get_column(ColumnsTable.DIR)
-        if value.is_empty:
-            return None
-        if (value[0] == '') or (value[0] == 'nan') or (value[0] == 'None') \
-                or (value[0] == '-') or (value[0] == 'NaT'):
-            return None
-        try:
-            _dir_path = sp.Directory(value[0])
-        except Exception as e:
-            print(e)
-            return None
-        else:
-            if _dir_path.path.exists():
-                return _dir_path
-            return None
-
-    @property
-    def extension_file(self) -> str | None:
-        value: ListColumnBody = self.tb.get_column(ColumnsTable.FILETYPE)
-        if value.is_empty:
-            return None
-        if (value[0] == '') or (value[0] == 'nan') or (value[0] == 'None') \
-                or (value[0] == '-') or (value[0] == 'NaT'):
-            return None
-        return value[0]
-
-    @property
-    def lines(self) -> ListColumnBody:
-        return self.tb.get_column(ColumnsTable.TEXT)
-
-    def __repr__(self):
-        return f'Carta: {self.get_lines_keys()}'
-
-    @abstractmethod
-    def get_line_key(self) -> str:
-        pass
-
-    @abstractmethod
-    def get_lines_keys(self) -> ArrayString:
-        pass
-
-    def to_excel(self, file: sp.File):
-        self.tb.to_data().to_excel(file.absolute())
-
-    def to_file_text(self, file: sp.File):
-        lines = self.lines
-        print(f'Exportando: {file.absolute()}')
-        with open(file.absolute(), 'w', encoding='utf-8') as f:
-            f.writelines(lines)
 
 
 class CartaCalculo(Carta):
@@ -140,33 +52,61 @@ class CartaCalculo(Carta):
         return remove_bad_chars(_loc).upper()
 
     @property
-    def medidor(self) -> str:
-        lines = self.lines
-        out: str | None = lines.find_text('MEDI')
-        if out is None:
-            return 'nan'
-        if not ' ' in out:
-            return remove_bad_chars(out)
-        arr = ArrayString(out.split(' '))
-        return remove_bad_chars(' '.join(arr.get_next_all('MEDI'))).upper()
+    def medidor(self) -> str | None:
+        _medidor = self.lines.find_text('MEDI')
+
+        if _medidor is None:
+            return None
+        arr = ArrayString(_medidor.split(' '))
+        arr = arr.get_next_all('MEDI')
+        if arr.is_empty:
+            return None
+        final_medidor = ' '.join(arr)
+        if len(final_medidor) > 12:
+            final_medidor = final_medidor[:12]
+        return remove_bad_chars(final_medidor)
 
     def get_line_key(self) -> str | None:
         _check = ['UC', 'TOI', 'TOL']
         _key_word = 'CAR'
         lines = self.lines
+        filter_list = ArrayString([])
         elements = ArrayString([])
-        list_idx: list[int] = []
+        list_index: list[int] = []
+
+        # Filtrar os indices desejados.
+        for txt in _check:
+            idx = lines.find_index(txt)
+            if idx is not None:
+                if not idx in list_index:
+                    list_index.append(idx)
+
+        # Gerar nova lista com os valores filtrados.
+        for num in list_index:
+            if ' ' in lines[num]:
+                filter_list.extend(lines[num].split(' '))
+            else:
+                filter_list.append(lines[num])
+
+        # Gerar a linha final
         for item in _check:
-            i = lines.find_index(item, case=False, iqual=False)
+            i = filter_list.get_next_string(item)
             if i is not None:
-                if not i in list_idx:
-                    list_idx.append(i)
-        for idx in list_idx:
-            elements.append(lines[idx])
+                elements.append(i)
 
         if elements.length == 0:
-            return None
-        return ' '.join(elements)
+            final_line: str = ''
+        else:
+            final_line: str = ' '.join(elements)
+
+        # Incluir a cidade
+        cidade = self.cidade
+        medidor = self.medidor
+        if medidor is not None:
+            final_line = f'{final_line}-{medidor}'
+        if cidade is not None:
+            final_line = f'{final_line}-{cidade}'
+        return remove_bad_chars(final_line)
 
     def get_lines_keys(self) -> ArrayString:
         lines = self.lines
@@ -192,7 +132,8 @@ def move_cartas(cartas: list[Carta], output_dir: sp.Directory):
                 continue
             if not src_file.exists():
                 continue
-            output_file_name = carta.get_line_key()
+            output_file_name = fmt_str_file(carta.get_line_key())
+
             if output_file_name is None:
                 continue
             if carta.extension_file is None:

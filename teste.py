@@ -23,13 +23,13 @@ def test():
     src_sheet = File('/home/brunoc/Documentos/BASE/base-gm.xlsx')
     src_dir = Directory('/mnt/dados/Teste')
     input_files = InputFiles(src_dir)
-    files = input_files.get_files(file_type=LibraryDocs.PDF)[0:3]
+    files = input_files.get_files(file_type=LibraryDocs.PDF)
 
     for f in files:
         tb = org.read_document(cs.DocumentPdf(f))
         if tb.length == 0:
             continue
-            
+
         carta = org.CartaCalculo(tb)
         org.cartas.move_cartas([carta], dest)
 
