@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "organize_stream"
-version = "2.4.4"
+version = "2.4.5"
 authors = [
   { name="Bruno Chaves"},
 ]
@@ -17,7 +17,7 @@ dependencies = [
     "soup_files>=1.4",
     "PyMuPDF",
     "convert_stream>=2.4.4",
-    "sheet_stream>=1.1",
+    "sheet_stream>=0.1.1",
     "ocr_stream>=2.4.1",
     "pandas",
     "opencv-python",
