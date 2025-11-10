@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 from typing import Union
+from organize_stream.type_utils.observer import Observer, NotifyProvider
 from organize_stream.type_utils import (
-    FilterText, FilterData, DigitalizedDocument, LibDigitalized, Observer
+    FilterText, FilterData, DigitalizedDocument, LibDigitalized
 )
 from organize_stream.find import (
     NameFinderInnerText, NameFinderInnerData, OriginFileName, DestFileName
@@ -77,14 +78,14 @@ class Organize(Observer):
         super().__init__()
         self._count: int = 0
         self.output_dir: sp.Directory = output_dir
-        self.extractor: DocumentTextExtract = DocumentTextExtract()
-        self.extractor.add_observer(self)
-        self.extractor.threshold = False
         self.pbar: sp.ProgressBarAdapter = sp.ProgressBarAdapter()
         self.max_char: int = 90
         self.upper_case: bool = True
         self.save_tables: bool = True
         self.filters: FilterText = filters
+        self.extractor: DocumentTextExtract = DocumentTextExtract()
+        self.extractor.add_observer(self)
+        self.extractor.threshold = False
 
     @property
     def output_dir_tables(self) -> sp.Directory:

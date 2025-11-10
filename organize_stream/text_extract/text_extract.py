@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+from __future__ import annotations
 from sheet_stream import TableDocuments, concat_table_documents
 from organize_stream.read import read_image, read_document, Ocr
 from organize_stream.type_utils.observer import NotifyProvider
