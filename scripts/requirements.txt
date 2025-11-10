@@ -10,6 +10,8 @@ convert_stream>=2.4.3
 ocr_stream>=2.4.2
 scipy
 easyocr
+sheet_stream>=1.1
+
 
 
 

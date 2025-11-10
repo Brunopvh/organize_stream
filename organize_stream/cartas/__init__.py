@@ -1,4 +1,6 @@
-from .carta_calculo import CartaCalculo, GenericDocument, DigitalizedDocument
+from .carta_calculo import (
+    CartaCalculo, GenericDocument, DigitalizedDocument, FichaEpi
+)
 from organize_stream.utils import fmt_str_file
 import soup_files as sp
 import shutil
@@ -36,5 +38,5 @@ def move_cartas(cartas: list[DigitalizedDocument], output_dir: sp.Directory):
 
 
 __all__ = [
-    'CartaCalculo', 'GenericDocument', 'move_cartas'
+    'CartaCalculo', 'GenericDocument', 'move_cartas', 'FichaEpi'
 ]

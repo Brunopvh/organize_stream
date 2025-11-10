@@ -9,7 +9,7 @@ from organize_stream.find import (
 )
 from organize_stream.read import create_tb_from_names
 from organize_stream.text_extract import DocumentTextExtract
-from organize_stream.cartas import CartaCalculo, GenericDocument
+from organize_stream.cartas import CartaCalculo, GenericDocument, FichaEpi
 from organize_stream.erros import InvalidTDigitalizedDocument
 from sheet_stream import TableDocuments, ColumnsTable
 import soup_files as sp
@@ -196,7 +196,7 @@ class OrganizeInnerText(Organize):
         elif self.lib_digitalized == LibDigitalized.CARTA_CALCULO:
             dg = CartaCalculo.create(tb)
         elif self.lib_digitalized == LibDigitalized.EPI:
-            return
+            dg = FichaEpi.create(tb)
         else:
             raise InvalidTDigitalizedDocument()
         new_names: dict[OriginFileName, DestFileName] = self.name_finder.get_new_name(dg)

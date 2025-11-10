@@ -5,7 +5,7 @@ from organize_stream.type_utils import DigitalizedDocument, FilterText
 from organize_stream.utils import remove_bad_chars
 from sheet_stream import (
     ArrayString, ListColumnBody, TableDocuments,
-    BAD_STRING_CHARS, ListString, ColumnsTable
+    BAD_STRING_CHARS, ListString, ColumnsTable, ConvertStringDate, LibDate
 )
 import pandas as pd
 
@@ -167,14 +167,6 @@ class GenericDocument(DigitalizedDocument):
             # AQUI estava: '(' + '|'.join(patterns) + ')'
             regex_pattern = '(?:' + '|'.join(patterns) + ')'  # Mude para (?:...)
 
-        # Define padrão regex dependendo de "iqual"
-        """
-        if self.filters.iqual:
-            regex_pattern = '^(' + '|'.join(patterns) + ')$'
-        else:
-            regex_pattern = '(' + '|'.join(patterns) + ')'
-        """
-
         # Filtra linhas no DataFrame
         mask: pd.Series = df[ColumnsTable.TEXT].str.contains(
             regex_pattern,
@@ -228,3 +220,62 @@ class GenericDocument(DigitalizedDocument):
         return f'{_filename}{_extension}'
 
 
+class FichaEpi(GenericDocument):
+
+    def __init__(self, tb: TableDocuments, *, filters: FilterText):
+        super().__init__(tb, filters=filters)
+        self.dias = [
+            'segunda-feira', 'terca-feira', 'quarta-feira', 'quinta-feira',
+            'sexta-feira', 'sabado',
+        ]
+
+    @classmethod
+    def create(cls, tb: TableDocuments) -> FichaEpi:
+        fil = FilterText('MATR', key_words=['NOME'])
+        return cls(tb, filters=fil)
+
+    def get_line_key(self) -> str:
+        return self.get_nome()
+
+    def get_output_filename(self) -> str | None:
+        line_date = self.get_date_doc()
+        filename = self.get_nome()
+        _extension = self.extension_file
+        if filename is None:
+            return None
+        if _extension is None:
+            return None
+        if line_date is not None:
+            filename = f'{filename}-{line_date}'
+        filename = fmt_str_file(filename)
+        return f'{filename}{_extension}'
+
+    def get_nome(self) -> str | None:
+        return self.tb.get_column(ColumnsTable.TEXT).get_next_string('MATR')
+
+    def get_date_doc(self) -> str | None:
+        lines = self.lines
+        _date_line: str = None
+        _date_txt: str = None
+        for d in self.dias:
+            txt = lines.find_text(d)
+            if txt is not None:
+                _date_line = txt
+                _date_txt = d
+                break
+        if _date_line is None:
+            return None
+        idx = _date_line.find(_date_txt)
+        _date_line = _date_line[idx:].replace(_date_txt, '').strip()
+        try:
+            arr = ArrayString(_date_line.split(' '))
+            conv: dict = ConvertStringDate().month_to_number
+            _day = arr.get_back_string('de')
+            _year = arr[-1]
+            _month = arr.get_next_string('de').strip().lower()
+            _month = conv[_month]
+        except Exception as e:
+            pass
+        else:
+            _date_line = f'{_year}-{_month}-{_day}'.replace('.', '')
+        return _date_line
