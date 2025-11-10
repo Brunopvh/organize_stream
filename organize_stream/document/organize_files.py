@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 from typing import Union
+from organize_stream.type_utils import (
+    FilterText, FilterData, DigitalizedDocument, LibDigitalized, Observer
+)
 from organize_stream.find import (
-    NameFinderInnerText, NameFinderInnerData, FilterText,
-    FilterData, OriginFileName, DestFileName
+    NameFinderInnerText, NameFinderInnerData, OriginFileName, DestFileName
 )
 from organize_stream.read import create_tb_from_names
-from organize_stream.type_utils.observer import Observer
-from organize_stream.document.text_extract import DocumentTextExtract
+from organize_stream.text_extract import DocumentTextExtract
+from organize_stream.cartas import CartaCalculo, GenericDocument
+from organize_stream.erros import InvalidTDigitalizedDocument
 from sheet_stream import TableDocuments, ColumnsTable
 import soup_files as sp
 import convert_stream as cs
@@ -70,20 +73,22 @@ def move_path_files(
 
 class Organize(Observer):
 
-    def __init__(self, filter_text: FilterText):
+    def __init__(self, output_dir: sp.Directory, *, filters: FilterText = None):
         super().__init__()
         self._count: int = 0
-        self.filter_text: FilterText = filter_text
+        self.output_dir: sp.Directory = output_dir
         self.extractor: DocumentTextExtract = DocumentTextExtract()
         self.extractor.add_observer(self)
         self.extractor.threshold = False
         self.pbar: sp.ProgressBarAdapter = sp.ProgressBarAdapter()
         self.max_char: int = 90
         self.upper_case: bool = True
+        self.save_tables: bool = True
+        self.filters: FilterText = filters
 
     @property
     def output_dir_tables(self) -> sp.Directory:
-        return self.filter_text.out_dir.concat('Tabelas', create=True)
+        return self.output_dir.concat('Tabelas', create=True)
 
     def _show_error(self, txt: str):
         print()
@@ -131,7 +136,7 @@ class Organize(Observer):
         self.export_final_table()
 
     def export_tables(self, tb: TableDocuments) -> None:
-        if not self.filter_text.save_tables:
+        if not self.save_tables:
             return
         origin_name = tb.get_column(ColumnsTable.FILE_NAME)[0]
         output_path = self.output_dir_tables.join_file(f'{origin_name}.xlsx')
@@ -140,11 +145,14 @@ class Organize(Observer):
             tb.to_data().to_excel(output_path.absolute(), index=False)
 
     def export_final_table(self):
-        if not self.filter_text.save_tables:
+        if not self.save_tables:
             return
         self.extractor.to_excel(self.output_dir_tables.join_file('data.xlsx'))
 
     def receive_notify(self, notify: TableDocuments) -> None:
+        pass
+
+    def move_digitalized_doc(self, tb: TableDocuments) -> None:
         pass
 
 
@@ -158,23 +166,39 @@ class OrganizeInnerText(Organize):
 
     """
 
-    def __init__(self, filter_text: FilterText):
-        super().__init__(filter_text)
-        self.name_finder: NameFinderInnerText = NameFinderInnerText(self.filter_text)
+    def __init__(
+                self,
+                output_dir: sp.Directory, *,
+                lib_digitalized: LibDigitalized = LibDigitalized.GENERIC,
+                filters: FilterText = None,
+            ):
+        super().__init__(output_dir, filters=filters)
+        self.lib_digitalized: LibDigitalized = lib_digitalized
+        self.name_finder: NameFinderInnerText = NameFinderInnerText(self.output_dir)
 
     def receive_notify(self, notify: TableDocuments) -> None:
         self._count += 1
-        self.move_where_contains_text(notify)
+        self.move_digitalized_doc(notify)
         self.export_tables(notify)
 
-    def move_where_contains_text(self, tb: TableDocuments) -> None:
+    def move_digitalized_doc(self, tb: TableDocuments) -> None:
         """
         Mover/Renomear arquivos de acordo com padrões de texto presentes
         nos documentos/imagens.
         """
-        new_names: dict[OriginFileName, DestFileName] = self.name_finder.get_new_name(
-            tb, max_char=self.max_char, upper_case=self.upper_case
-        )
+        dg: DigitalizedDocument
+        if self.lib_digitalized == LibDigitalized.GENERIC:
+            if self.filters is None:
+                print(f'DEBUG: {__class__.__name__} Falha ... o filtro está vazio.')
+                return
+            dg = GenericDocument(tb, filters=self.filters)
+        elif self.lib_digitalized == LibDigitalized.CARTA_CALCULO:
+            dg = CartaCalculo.create(tb)
+        elif self.lib_digitalized == LibDigitalized.EPI:
+            return
+        else:
+            raise InvalidTDigitalizedDocument()
+        new_names: dict[OriginFileName, DestFileName] = self.name_finder.get_new_name(dg)
         move_path_files(new_names, replace=False)
 
 
@@ -183,42 +207,19 @@ class OrganizeInnerData(Organize):
         Organizar os arquivos com base nos dados de uma tabela/DataFrame
     """
 
-    def __init__(self, filter_data: FilterData):
-        """
-        :param filter_data: FilterData com os nomes das colunas onde será buscado os textos a serem
-        filtrados linha a linha.
-        """
-        super().__init__(filter_data)
-        self.filter_data: FilterData = filter_data
-        self.name_inner_data: NameFinderInnerData = NameFinderInnerData(self.filter_data)
+    def __init__(self, output_dir: sp.Directory, *, filters: FilterData = None):
+        super().__init__(output_dir, filters=None)
+        self.filter_data: FilterData = filters
+        self.name_inner_data: NameFinderInnerData = NameFinderInnerData(self.output_dir, filters=self.filter_data)
 
     def receive_notify(self, notify: TableDocuments) -> None:
         self._count += 1
-        self.move_where_math_column(notify)
+        self.move_digitalized_doc(notify)
         self.export_tables(notify)
 
-    def move_where_math_column(self, tb: TableDocuments) -> None:
-        """
-            Mover arquivos conforme as ocorrências de texto encontradas na tabela/DataFrame df.
-        o nome do novo arquivo será igual à ocorrência de texto da coluna 'col_find', podendo
-        estender o nome com elementos de outras colunas, tais colunas podem ser informadas (opcionalmente)
-        no parâmetro cols_in_name.
-            Ex:
-        Suponha que a tabela para renomear aquivos tenha a seguinte estrutura:
-
-        A      B        C
-        maça   Cidade 1 xxyyy
-        banana Cidade 2 yyxxx
-        mamão  Cidade 3 xyxyx
-
-        Se passarmos os parâmetros col_find='A' e col_new_name='A' e o texto banana for
-        encontrado no(s) documento, o novo nome do arquivo será banana. Caso incluir o parâmetro
-        cols_in_name=['B'] o novo nome do arquivo será banana-Cidade 2 ou
-        banana-Cidade 2-yyxxx (se incluir cols_in_name=['B', 'C']).
-
-        """
+    def move_digitalized_doc(self, tb: TableDocuments) -> None:
         mv_items = self.name_inner_data.get_new_name(
-            tb, max_char=self.max_char, upper_case=self.upper_case
+            GenericDocument(tb, filters=None)
         )
         move_path_files(mv_items, replace=False)
 
@@ -245,6 +246,6 @@ class OrganizeInnerData(Organize):
         values: list[TableDocuments] = create_tb_from_names(files)
         for current_tb in values:
             mv_items = self.name_inner_data.get_new_name(
-                current_tb, max_char=self.max_char, upper_case=self.upper_case
+                GenericDocument(current_tb, filters=None)
             )
             move_path_files(mv_items, replace=False)

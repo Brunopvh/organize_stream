@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from sheet_stream import TableDocuments
+from sheet_stream import TableDocuments, concat_table_documents
 from organize_stream.read import read_image, read_document, Ocr
 from organize_stream.type_utils.observer import NotifyProvider
 import soup_files as sp
@@ -98,12 +98,9 @@ class DocumentTextExtract(NotifyProvider):
 
     def to_data(self) -> pd.DataFrame:
         if len(self.tb_list) == 0:
-            return cs.DictTextTable.create_void_df()
-        _data: list[pd.DataFrame] = []
-        for m in self.tb_list:
-            if m.length > 0:
-                _data.append(pd.DataFrame.from_dict(m))
-        return pd.concat(_data).astype('str')
+            return TableDocuments.create_void_df()
+        final_tb = concat_table_documents(self.tb_list)
+        return final_tb.to_data().astype('str')
 
     def to_excel(self, file: sp.File) -> None:
         try:

@@ -1,42 +1,16 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+from abc import ABC, abstractmethod
 import pandas as pd
 import soup_files as sp
 import convert_stream as cs
 from sheet_stream.type_utils import (
-    HeadCell, HeadValues, ColumnsTable, ListColumnBody, ListString, ArrayString, TableDocuments
+    HeadCell, HeadValues, ColumnsTable, ListColumnBody, ListString, ArrayString
 )
-from sheet_stream import clean_string, BAD_STRING_CHARS
 
-_remove_end_name: list[str] = ['-']
-_remove_start_name: list[str] = ['-']
-list_bad_chars: list[str] = BAD_STRING_CHARS.copy()
-
-
-def remove_bad_chars(text: str) -> str:
-    return clean_string(text)
-
-
-def fmt_str_file(
-            filename: str, *,
-            max_char: int = 80,
-            upper_case: bool = True
-        ) -> str:
-    filename = remove_bad_chars(filename)
-
-    for c in _remove_end_name:
-        if filename[-1] == c:
-            filename = filename[:-1]
-    for c in _remove_start_name:
-        while c in filename[0]:
-            filename = filename[1:]
-    while '--' in filename:
-        filename = filename.replace('--', '-')
-    if upper_case:
-        filename = filename.upper()
-    if len(filename) <= max_char:
-        return filename
-    return filename[0:max_char]
+from organize_stream.type_utils import DigitalizedDocument
+from organize_stream.type_utils.digital_doc import FilterData
+from organize_stream.utils import fmt_str_file
 
 
 def get_column_values(df: pd.DataFrame, col: str) -> ArrayString:
@@ -59,61 +33,6 @@ class DestFileName(sp.File):
 
     def __init__(self, filename: str):
         super().__init__(filename)
-
-
-class FilterText(object):
-    """
-        Padrão de informações a serem filtradas em um documento.
-    """
-
-    def __init__(
-            self,
-            find_txt: str,
-            out_dir: sp.Directory, *,
-            separator: str = ' ',
-            case: bool = False,
-            iqual: bool = False,
-            key_filter: str = None,
-            save_tables: bool = True,
-    ):
-        self.find_txt: str = find_txt
-        self.out_dir: sp.Directory = out_dir
-        self.case: bool = case
-        self.iqual: bool = iqual
-        self.separator: str = separator
-        self.key_filter: str = key_filter
-        self.save_tables: bool = save_tables
-
-
-class FilterData(FilterText):
-
-    def __init__(
-            self,
-            src_df: pd.DataFrame,
-            out_dir: sp.Directory, *,
-            col_find: str,
-            col_new_name: str,
-            cols_in_name: list[str],
-            separator: str = ' ',
-            case: bool = False,
-            iqual: bool = False,
-            key_filter: str = None,
-            find_txt: str = 'nan',
-            save_tables: bool = True
-    ):
-        super().__init__(
-            find_txt,
-            out_dir,
-            separator=separator,
-            case=case,
-            iqual=iqual,
-            key_filter=key_filter,
-            save_tables=save_tables
-        )
-        self.col_find: str = col_find
-        self.col_new_name: str = col_new_name
-        self.cols_in_name: list[str] = cols_in_name
-        self.src_df: pd.DataFrame = src_df.astype('str')
 
 
 class SearchableText(object):
@@ -228,103 +147,37 @@ class SearchableText(object):
         return s
 
 
-class NameFinder(object):
-    """
-    Recebe o texto bruto de documentos, e filtra texto baseado em padrões.
-    """
+class NameFinder(ABC):
 
-    def __init__(self, filter_text: FilterText):
-        self.filter_data: FilterText = filter_text
-        # Coluna que contem o texto usado como filtro em cada linha da busca
-        self._col_name_filter: str = HeadCell('FILTRO')
-        # Coluna que contem o texto de filtro adicional
-        self._col_include_filter: str = HeadCell('FILTRO ADICIONAL')
+    def __init__(self, output_dir: sp.Directory):
+        self.output_dir = output_dir
 
-    def get_new_name(
-            self,
-            tb: TableDocuments, *,
-            max_char: int = 90,
-            upper_case: bool = True,
-    ) -> dict[OriginFileName, DestFileName]:
+    @abstractmethod
+    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFileName]:
         pass
 
 
 class NameFinderInnerText(NameFinder):
 
-    def __init__(self, filter_text: FilterText):
-        super().__init__(filter_text)
+    def __init__(self, output_dir: sp.Directory):
+        super().__init__(output_dir)
 
-    def get_new_name(
-            self,
-            tb: TableDocuments, *,
-            max_char: int = 90,
-            upper_case: bool = True,
-    ) -> dict[OriginFileName, DestFileName]:
-        list_new_names: ListString = ListString([])
-        tb_txt_file: pd.DataFrame = pd.DataFrame.from_dict(tb)
-        df = tb_txt_file[[ColumnsTable.TEXT, ColumnsTable.FILE_PATH]].astype('str')
-
-        # Divide padrões múltiplos separados por "|"
-        patterns = [p.strip() for p in self.filter_data.find_txt.split('|') if p.strip()]
-        if not patterns:
-            print(f'{__class__.__name__}: Nenhum padrão de busca válido informado.')
+    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFileName]:
+        src_file = digitalized.file_path_origin
+        filename = digitalized.get_output_filename()
+        if (src_file is None) or (filename is None):
             return {}
-
-        # Define padrão regex dependendo de "iqual"
-        if self.filter_data.iqual:
-            regex_pattern = '^(' + '|'.join(patterns) + ')$'
-        else:
-            regex_pattern = '(' + '|'.join(patterns) + ')'
-
-        # Filtra linhas no DataFrame
-        mask: pd.Series = df[ColumnsTable.TEXT].str.contains(
-            regex_pattern,
-            case=self.filter_data.case,
-            regex=True,
-            na=False
-        )
-        matched_df = df[mask]
-        total_matches = len(matched_df)
-
-        if total_matches == 0:
+        if filename == '':
             return {}
-
-        # Para cada linha encontrada, gera nome limpo e adiciona à lista de movimentação
-        src_file: sp.File = sp.File(tb[ColumnsTable.FILE_PATH][0])
-        src_extension: str = tb[ColumnsTable.FILETYPE][0]
-        for _, row in matched_df.iterrows():
-            current_line: str = row[ColumnsTable.TEXT]
-            if self.filter_data.key_filter is not None:
-                if not self.filter_data.key_filter.upper() in current_line.upper():
-                    continue
-            # Usa o texto da linha como base do novo nome
-            current_output_name: str = fmt_str_file(current_line.strip())
-            if len(current_output_name) < 4:
-                continue
-            # Garante que o nome não fique vazio
-            if not current_output_name:
-                current_output_name = src_file.name()
-            list_new_names.append(current_output_name)
-
-        if len(list_new_names) == 0:
-            return {}
-        output_name: str = ' '.join(list_new_names)
-        if len(output_name) < 4:
-            return {}
-        if len(output_name) > max_char:
-            output_name = output_name[:max_char]
-        _origin = OriginFileName(src_file.absolute())
-        _dest_path = self.filter_data.out_dir.join_file(f'{output_name}{src_extension}')
-        if not isinstance(_dest_path, sp.File):
-            return {}
-        _dest = DestFileName(_dest_path.absolute())
-        return {_origin: _dest}
+        output_path = self.output_dir.join_file(filename)
+        return {OriginFileName(src_file.absolute()): DestFileName(output_path.absolute())}
 
 
 class NameFinderInnerData(NameFinder):
-    def __init__(self, filter_text: FilterData):
-        super().__init__(filter_text)
-        self.filter_data: FilterData = filter_text
+
+    def __init__(self, output_dir: sp.Directory, *, filters: FilterData):
+        super().__init__(output_dir)
+        self.filter_data = filters
 
     def get_values(self, df: pd.DataFrame, col: str) -> ArrayString:
         return get_column_values(df, col)
@@ -352,18 +205,20 @@ class NameFinderInnerData(NameFinder):
             new_name = f'{new_name}-{i}'
         return new_name
 
-    def get_new_name(
-                self,
-                tb: TableDocuments, *,
-                max_char: int = 90,
-                upper_case: bool = True,
-            ) -> dict[OriginFileName, DestFileName]:
+    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFileName]:
+        extension_file = digitalized.extension_file
+        _origin_path = digitalized.file_path_origin
+        if (extension_file is None) or (_origin_path is None):
+            return {}
+
         # Lista de valores da coluna texto.
         list_values_find: ArrayString = self.get_values(self.filter_data.src_df, self.filter_data.col_find)
+
         # Lista de valores da coluna com novos nomes de arquivo.
         content_new_names: ArrayString = self.get_values(self.filter_data.src_df, self.filter_data.col_new_name)
+
         # Lista de valores com as linhas de texto do arquivo em formato list[str].
-        lines_in_doc: ArrayString = ArrayString(tb.get_column(ColumnsTable.TEXT))
+        lines_in_doc: ArrayString = ArrayString(digitalized.get_lines_keys())
 
         line_df: str
         idx_df: int
@@ -380,29 +235,23 @@ class NameFinderInnerData(NameFinder):
                 output_name = f'{output_name}-{include_strings}'
             if output_name == '':
                 continue
-            output_name: str = fmt_str_file(output_name, max_char=max_char, upper_case=upper_case)
+            output_name: str = fmt_str_file(output_name)
             break
 
         if output_name is None:
             return {}
-        if len(output_name) > max_char:
-            output_name = output_name[:max_char]
 
-        extension_file = tb.get_column(ColumnsTable.FILETYPE)[0]
         output_name = f'{output_name}{extension_file}'
-        _dest_path = self.filter_data.out_dir.join_file(output_name)
-        _origin_path = sp.File(tb.get_column(ColumnsTable.FILE_PATH)[0])
+        _dest_path = self.output_dir.join_file(output_name)
+
         if not isinstance(_dest_path, sp.File):
             return {}
         if not isinstance(_origin_path, sp.File):
             return {}
-        _dest = DestFileName(_dest_path.absolute())
-        _origin = OriginFileName(_origin_path.absolute())
-        return {_origin: _dest}
+        return {OriginFileName(_origin_path.absolute()): DestFileName(_dest_path.absolute())}
 
 
-class NameFinderInnerCarta(NameFinder):
-
-    def __init__(self, filter_text: FilterText):
-        super().__init__(filter_text)
-
+__all__ = [
+    'get_column_values', 'OriginFileName', 'DestFileName', 'SearchableText',
+    'NameFinderInnerData', 'NameFinderInnerText', 'NameFinder',
+]

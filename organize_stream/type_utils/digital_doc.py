@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+import pandas as pd
 from organize_stream.erros import TableFileEmptyError
 from sheet_stream import (
     TableDocuments, ArrayString, ColumnsTable,
@@ -8,17 +9,52 @@ from sheet_stream import (
 import soup_files as sp
 
 
-class Carta(ABC):
+class FilterText(object):
+    """
+        Padrão de informações a serem filtradas em um documento.
+    """
 
-    def __init__(self, tb: TableDocuments):
+    def __init__(
+                self,
+                find_txt: str, *,
+                separator: str = ' ',
+                case: bool = False,
+                iqual: bool = False,
+                key_words: list[str] = None,
+            ):
+        self.find_txt: str = find_txt
+        self.case: bool = case
+        self.iqual: bool = iqual
+        self.separator: str = separator
+        self.key_words: list[str] = key_words
+
+
+class FilterData(object):
+
+    def __init__(
+                self,
+                src_df: pd.DataFrame, *,
+                col_find: str,
+                col_new_name: str,
+                cols_in_name: list[str],
+            ):
+        self.col_find: str = col_find
+        self.col_new_name: str = col_new_name
+        self.cols_in_name: list[str] = cols_in_name
+        self.src_df: pd.DataFrame = src_df.astype('str')
+
+
+class DigitalizedDocument(ABC):
+
+    def __init__(self, tb: TableDocuments, *, filters: FilterText):
         self.tb: TableDocuments = tb
         if self.tb.length == 0:
             raise TableFileEmptyError('A tabela de arquivos não pode estar vazia!')
-        self._uniq_key_words = ArrayString([])
+        self.filters: FilterText = filters
 
     @property
     def uniq_key_words(self) -> ArrayString:
-        return self._uniq_key_words
+        return ArrayString(self.filters.key_words)
 
     @property
     def file_path_origin(self) -> sp.File | None:
@@ -71,14 +107,17 @@ class Carta(ABC):
         return self.tb.get_column(ColumnsTable.TEXT)
 
     def __repr__(self):
-        return f'Carta: {self.get_lines_keys()}'
+        return f'{__class__.__name__}: {self.get_line_key()}'
 
     @abstractmethod
     def get_line_key(self) -> str:
         pass
 
-    @abstractmethod
     def get_lines_keys(self) -> ArrayString:
+        return self.tb.get_column(ColumnsTable.TEXT)
+
+    @abstractmethod
+    def get_output_filename(self) -> str | None:
         pass
 
     def to_excel(self, file: sp.File):

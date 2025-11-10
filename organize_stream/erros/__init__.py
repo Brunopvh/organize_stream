@@ -1,3 +1,11 @@
 
 class TableFileEmptyError(Exception):
-    pass
+    def __init__(self, *args):
+        super().__init__(*args)
+
+
+class InvalidTDigitalizedDocument(Exception):
+
+    def __init__(self, *args):
+        super().__init__(*args)
+
