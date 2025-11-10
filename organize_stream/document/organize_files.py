@@ -111,6 +111,7 @@ class Organize(Observer):
                 ((n + 1) / total) * 100,
                 f'[ADICIONANDO IMAGEM] {n + 1}/{total} {image.metadata.name}'
             )
+            print()
             self.add_image(image)
         self.export_final_table()
 

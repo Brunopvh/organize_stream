@@ -134,7 +134,7 @@ class CartaCalculo(DigitalizedDocument):
 
     def get_output_filename(self) -> str | None:
         line_key = self.get_line_key()
-        if line_key is None:
+        if (line_key is None) or (line_key == ''):
             return None
         line_key = fmt_str_file(line_key)
         extension_file = self.extension_file
@@ -161,9 +161,19 @@ class GenericDocument(DigitalizedDocument):
 
         # Define padrão regex dependendo de "iqual"
         if self.filters.iqual:
+            # AQUI estava: '^(' + '|'.join(patterns) + ')$'
+            regex_pattern = '^(?:' + '|'.join(patterns) + ')$'  # Mude para (?:...)
+        else:
+            # AQUI estava: '(' + '|'.join(patterns) + ')'
+            regex_pattern = '(?:' + '|'.join(patterns) + ')'  # Mude para (?:...)
+
+        # Define padrão regex dependendo de "iqual"
+        """
+        if self.filters.iqual:
             regex_pattern = '^(' + '|'.join(patterns) + ')$'
         else:
             regex_pattern = '(' + '|'.join(patterns) + ')'
+        """
 
         # Filtra linhas no DataFrame
         mask: pd.Series = df[ColumnsTable.TEXT].str.contains(
@@ -206,9 +216,14 @@ class GenericDocument(DigitalizedDocument):
         pass
 
     def get_output_filename(self) -> str | None:
+        if self.tb.get_column(ColumnsTable.TEXT).length == 0:
+            return None
+
         _filename = self._get_value_with_str(self.tb)
         _extension = self.extension_file
         if _extension is None:
+            return None
+        if _filename is None:
             return None
         return f'{_filename}{_extension}'
 

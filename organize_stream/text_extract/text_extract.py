@@ -35,6 +35,8 @@ class DocumentTextExtract(NotifyProvider):
         return len(self.tb_list) == 0
 
     def add_table(self, tb: TableDocuments) -> None:
+        if tb.length == 0:
+            return
         self.tb_list.append(tb)
         self._count += 1
         self.pbar.update_text(f'{__class__.__name__} Tabela adicionada: {self._count}')
@@ -53,6 +55,7 @@ class DocumentTextExtract(NotifyProvider):
                 ((n + 1) / total) * 100,
                 f'{n + 1}/{total} {f.basename()}',
             )
+            print()
             if apply_ocr:
                 tb = read_document(cs.DocumentPdf(f), self.recognize, pbar=self.pbar, dpi=dpi)
             else:
