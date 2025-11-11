@@ -72,7 +72,7 @@ def move_path_files(
             print(e)
 
 
-class Organize(Observer):
+class ExtractName(Observer):
 
     def __init__(self, output_dir: sp.Directory, *, filters: FilterText = None):
         super().__init__()
@@ -94,6 +94,9 @@ class Organize(Observer):
     def _show_error(self, txt: str):
         print()
         self.pbar.update_text(f'{__class__.__name__} {txt}')
+
+    def add_table(self, tb: TableDocuments):
+        pass
 
     def add_image(self, image: cs.ImageObject | sp.File):
         if isinstance(image, sp.File):
@@ -158,7 +161,7 @@ class Organize(Observer):
         pass
 
 
-class OrganizeInnerText(Organize):
+class ExtractNameInnerText(ExtractName):
     """
     Mover/Renomear arquivos de acordo com padrões de texto presentes
     nos documentos/imagens.
@@ -183,6 +186,10 @@ class OrganizeInnerText(Organize):
         self.move_digitalized_doc(notify)
         self.export_tables(notify)
 
+    def add_table(self, tb: TableDocuments):
+        self.move_digitalized_doc(tb)
+        self.export_tables(tb)
+
     def move_digitalized_doc(self, tb: TableDocuments) -> None:
         """
         Mover/Renomear arquivos de acordo com padrões de texto presentes
@@ -204,7 +211,7 @@ class OrganizeInnerText(Organize):
         move_path_files(new_names, replace=False)
 
 
-class OrganizeInnerData(Organize):
+class ExtractNameInnerData(ExtractName):
     """
         Organizar os arquivos com base nos dados de uma tabela/DataFrame
     """
@@ -218,6 +225,10 @@ class OrganizeInnerData(Organize):
         self._count += 1
         self.move_digitalized_doc(notify)
         self.export_tables(notify)
+
+    def add_table(self, tb: TableDocuments):
+        self.move_digitalized_doc(tb)
+        self.export_tables(tb)
 
     def move_digitalized_doc(self, tb: TableDocuments) -> None:
         mv_items = self.name_inner_data.get_new_name(

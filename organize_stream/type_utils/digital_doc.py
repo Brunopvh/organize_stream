@@ -46,6 +46,8 @@ class FilterData(object):
 
 class DigitalizedDocument(ABC):
 
+    default_filter: FilterText | None = None
+
     def __init__(self, tb: TableDocuments, *, filters: FilterText):
         self.tb: TableDocuments = tb
         if self.tb.length == 0:

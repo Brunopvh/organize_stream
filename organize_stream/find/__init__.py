@@ -8,7 +8,7 @@ from sheet_stream.type_utils import (
     HeadCell, HeadValues, ColumnsTable, ListColumnBody, ListString, ArrayString
 )
 
-from organize_stream.type_utils import DigitalizedDocument
+from organize_stream.type_utils import DigitalizedDocument, OriginFileName, DestFileName
 from organize_stream.type_utils.digital_doc import FilterData
 from organize_stream.utils import fmt_str_file
 
@@ -21,18 +21,6 @@ def get_column_values(df: pd.DataFrame, col: str) -> ArrayString:
         return ArrayString([])
     else:
         return ArrayString(_values)
-
-
-class OriginFileName(sp.File):
-
-    def __init__(self, filename: str):
-        super().__init__(filename)
-
-
-class DestFileName(sp.File):
-
-    def __init__(self, filename: str):
-        super().__init__(filename)
 
 
 class SearchableText(object):

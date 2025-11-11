@@ -1,3 +1,3 @@
 from .organize_files import (
-    Organize, OrganizeInnerText, OrganizeInnerData,
+    ExtractName, ExtractNameInnerText, ExtractNameInnerData,
 )

@@ -12,6 +12,14 @@ import pandas as pd
 
 class CartaCalculo(DigitalizedDocument):
 
+    default_filter = FilterText(
+            'TOI',
+            separator=' ',
+            key_words=['UC', 'TOI', 'POSTAGEM', 'LIVRO'],
+            iqual=False,
+            case=False,
+        )
+
     def __init__(self, tb: TableDocuments, *, filters: FilterText):
         super().__init__(tb, filters=filters)
 
@@ -26,14 +34,7 @@ class CartaCalculo(DigitalizedDocument):
 
     @classmethod
     def create(cls, tb: TableDocuments) -> CartaCalculo:
-        _fil = FilterText(
-            'TOI',
-            separator=' ',
-            key_words=['UC', 'TOI', 'POSTAGEM', 'LIVRO'],
-            iqual=False,
-            case=False,
-        )
-        return cls(tb, filters=_fil)
+        return cls(tb, filters=cls.default_filter)
 
     @property
     def cidade(self) -> str | None:

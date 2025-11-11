@@ -21,6 +21,7 @@ class NotifyProvider(object):
         self.__observers.append(observer)
 
     def send_notify(self, tb: TableDocuments) -> None:
+        print(f'{__class__.__name__} Notificando observadores!')
         for obs in self.__observers:
             obs.receive_notify(tb)
 

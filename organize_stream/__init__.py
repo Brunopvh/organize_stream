@@ -14,7 +14,7 @@ from .find import (
 )
 from .text_extract import DocumentTextExtract
 from .document import (
-    OrganizeInnerData, OrganizeInnerText,
+    ExtractNameInnerData, ExtractNameInnerText,
 )
 from .cartas import CartaCalculo, GenericDocument
 

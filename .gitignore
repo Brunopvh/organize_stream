@@ -3,5 +3,9 @@ organize_stream/__pycache__/
 organize_stream/document/__pycache__/
 organize_stream/find/__pycache__/
 organize_stream/read/__pycache__/
+organize_stream/cartas/__pycache__/
+organize_stream/erros/__pycache__/
+organize_stream/text_extract/__pycache__/
+organize_stream/type_utils/__pycache__/
 
 

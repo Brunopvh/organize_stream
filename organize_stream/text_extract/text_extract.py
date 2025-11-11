@@ -19,8 +19,16 @@ class DocumentTextExtract(NotifyProvider):
         self.tb_list: list[TableDocuments] = []
         self.recognize: ocr.RecognizeImage = recognize_image
         self.threshold: bool = False
-        self._count: int = 0
+        self.__count_idx: int = 0
         self._pbar = sp.ProgressBarAdapter()
+
+    @property
+    def values(self) -> list[TableDocuments]:
+        return self.tb_list
+
+    @property
+    def length(self) -> int:
+        return self.__count_idx
 
     @property
     def pbar(self) -> sp.ProgressBarAdapter:
@@ -35,17 +43,20 @@ class DocumentTextExtract(NotifyProvider):
         return len(self.tb_list) == 0
 
     def add_table(self, tb: TableDocuments) -> None:
+        if not isinstance(tb, TableDocuments):
+            print(f'DEBUG: Tabela inválida: {tb}')
+            return
         if tb.length == 0:
+            print(f'DEBUG: Tabela vazia: {tb}')
             return
         self.tb_list.append(tb)
-        self._count += 1
-        self.pbar.update_text(f'{__class__.__name__} Tabela adicionada: {self._count}')
+        self.__count_idx += 1
         self.send_notify(tb)
 
     def add_directory_pdf(
                 self,
                 dir_pdf: sp.Directory, *,
-                apply_ocr: bool = False,
+                apply_ocr: bool = True,
                 dpi: int = 200
             ):
         files = sp.InputFiles(dir_pdf).get_files(file_type=sp.LibraryDocs.PDF)
@@ -75,7 +86,7 @@ class DocumentTextExtract(NotifyProvider):
                 img.set_threshold_gray()
             self.add_table(read_image(img, recognize=self.recognize))
 
-    def add_file_pdf(self, file_pdf: sp.File, *, apply_ocr: bool = False, dpi: int = 200):
+    def add_file_pdf(self, file_pdf: sp.File, *, apply_ocr: bool = True, dpi: int = 200):
         if apply_ocr:
             tb = read_document(cs.DocumentPdf(file_pdf), self.recognize, pbar=self.pbar, dpi=dpi)
         else:
