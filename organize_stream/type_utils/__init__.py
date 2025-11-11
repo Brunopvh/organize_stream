@@ -1,5 +1,6 @@
 from .observer import Observer, NotifyProvider
 from .digital_doc import DigitalizedDocument, FilterText, FilterData
+from .iterator import IterTable, Table, TableRow
 from enum import StrEnum
 from soup_files import File, ProgressBarAdapter
 
@@ -43,12 +44,10 @@ class TextProgress(object):
         self.start_value += 1
 
 
-class IterRowsTb(object):
-    pass
-
 __all__ = [
     'DigitalizedDocument', 'FilterText', 'Observer',
     'NotifyProvider', 'LibDigitalized', 'FilterData',
     'OriginFileName', 'DestFileName', 'TextProgress',
+    'IterTable', 'Table', 'TableRow',
 ]
 
