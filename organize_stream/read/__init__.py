@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import os.path
 from io import BytesIO
-import convert_stream as cs
-import ocr_stream as ocr
-import soup_files as sp
-import sheet_stream as sheet
-from sheet_stream.type_utils import (
-    ColumnsTable, TableDocuments, HeadValues, ListColumnBody, HeadCell, ListString
+from typing import Callable, Optional
+from organize_stream.utils import (
+    cs, sp, sheet, ocr, HeadValues, ListColumnBody, HeadCell, ListString, ColumnsTable,
 )
+from organize_stream.type_utils import TextProgress, Table as TableDocuments
 
 
 class Ocr(ocr.RecognizeImage):
@@ -91,10 +88,10 @@ def create_tb_from_names(files: list[sp.File]) -> list[cs.DictTextTable]:
     return values
 
 
-def read_image(img: cs.ImageObject, recognize: ocr.RecognizeImage = Ocr()) -> sheet.TableDocuments:
+def read_image(img: cs.ImageObject, recognize: ocr.RecognizeImage = Ocr()) -> TableDocuments:
     txt_image = recognize.image_to_string(img)
     try:
-        tb = sheet.TableDocuments.create_from_values(
+        tb = TableDocuments.create_from_values(
             txt_image.split('\n'),
             file_path=img.metadata.file_path,
             dir_path=img.metadata.dir_path,
@@ -104,7 +101,7 @@ def read_image(img: cs.ImageObject, recognize: ocr.RecognizeImage = Ocr()) -> sh
         print('---------------------------------------------')
         print(f'DEBUG: falha ao tentar gerar a tabela de: {img.metadata.file_path}\n{err}')
         print('---------------------------------------------')
-        return sheet.TableDocuments.create_void_dict()
+        return TableDocuments.create_void_dict()
     else:
         return tb
 
@@ -114,20 +111,29 @@ def read_document(
             recognize: ocr.RecognizeImage = Ocr(), *,
             pbar: sp.ProgressBarAdapter = sp.ProgressBarAdapter(),
             dpi: int = 200,
-        ) -> sheet.TableDocuments:
-    list_tables: list[sheet.TableDocuments] = []
-    pbar.start()
-    pbar.update(0, 'Iniciando a extração da tabela PDF')
+            func_read_image: Callable[[cs.ImageObject, Optional[ocr.RecognizeImage]], TableDocuments] = None,
+        ) -> TableDocuments:
+    """
+    Aplicar OCR em documento PDF e retornar uma tabela
+    dos textos presentes no documento.
+    """
+    if func_read_image is None:
+        func_read_image = read_image
+    list_tables: list[TableDocuments] = []
+    text_progress = TextProgress()
+    text_progress.set_pbar(pbar)
+    text_progress.start_pbar()
+    text_progress.get_pbar().update(0, 'Iniciando a extração da tabela PDF')
+
     convert = cs.ConvertPdfToImages.create(document)
     convert.set_pbar(pbar)
     images: list[cs.ImageObject] = convert.to_images(dpi=dpi)
-    total = len(images)
+    text_progress.total = len(images)
+    text_progress.set_default_text('OCR PDF')
+
     for page_pdf_idx, img in enumerate(images):
-        pbar.update(
-            ((page_pdf_idx + 1) / total) * 100,
-            f'[OCR PDF] {page_pdf_idx+1}/{total} {document.name}',
-        )
-        current_tb: sheet.TableDocuments = read_image(img, recognize)
+        text_progress.set_update()
+        current_tb: TableDocuments = func_read_image(img, recognize)
         if current_tb.length > 0:
             current_tb = update_column_table(
                 current_tb, name=sheet.ColumnsTable.FILETYPE, new_value=document.metadata.extension
@@ -136,8 +142,8 @@ def read_document(
                 current_tb, name=sheet.ColumnsTable.NUM_PAGE, new_value=f'{page_pdf_idx+1}'
             )
             list_tables.append(current_tb)
-    pbar.update(100, 'Extração finalizada!')
-    pbar.stop()
+    text_progress.get_pbar().update(100, 'Extração finalizada!')
+    text_progress.stop_pbar()
     return concat_tables(list_tables)
 
 

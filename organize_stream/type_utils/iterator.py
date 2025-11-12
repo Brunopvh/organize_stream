@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterable, Iterator
-from sheet_stream import TableDocuments, TableRow, ListColumnBody
+from organize_stream.utils import TableDocuments, ListColumnBody, HeadCell, HeadValues, TableRow
 
 
 class IterTable(Iterator):
@@ -40,4 +40,7 @@ class Table(TableDocuments):
 
     def iter_tables(self) -> Iterable[ListColumnBody]:
         return IterTable(self, True)
+
+    def keys(self) -> HeadValues:
+        return HeadValues(list(super().keys()))
 

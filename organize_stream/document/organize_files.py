@@ -12,7 +12,8 @@ from organize_stream.read import create_tb_from_names
 from organize_stream.text_extract import DocumentTextExtract
 from organize_stream.cartas import CartaCalculo, GenericDocument, FichaEpi
 from organize_stream.erros import InvalidTDigitalizedDocument
-from sheet_stream import TableDocuments, ColumnsTable
+from organize_stream.type_utils.iterator import Table as TableDocuments
+from sheet_stream import ColumnsTable
 import soup_files as sp
 import convert_stream as cs
 import shutil
