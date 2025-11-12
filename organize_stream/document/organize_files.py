@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 from typing import Union
-from organize_stream.type_utils.observer import Observer, NotifyProvider
 from organize_stream.type_utils import (
-    FilterText, FilterData, DigitalizedDocument, LibDigitalized
+    FilterText, FilterData, DigitalizedDocument, LibDigitalized, Observer,
+    NotifyProvider, KeyFiles, KeyWordsFileNames, DiskFile, DynamicFile,
+    Table as TableDocuments
 )
 from organize_stream.find import (
     NameFinderInnerText, NameFinderInnerData, OriginFileName, DestFileName
 )
+from organize_stream.utils import (sp, cs)
 from organize_stream.read import create_tb_from_names
 from organize_stream.text_extract import DocumentTextExtract
 from organize_stream.cartas import CartaCalculo, GenericDocument, FichaEpi
 from organize_stream.erros import InvalidTDigitalizedDocument
-from organize_stream.type_utils.iterator import Table as TableDocuments
 from sheet_stream import ColumnsTable
-import soup_files as sp
-import convert_stream as cs
 import shutil
 
 FindItem = Union[str, list[str]]
@@ -71,6 +70,54 @@ def move_path_files(
             shutil.move(_k.absolute(), output_path.absolute())
         except Exception as e:
             print(e)
+
+
+class NameFileInnerTable(object):
+
+    def __init__(
+                self,
+                extractor: DocumentTextExtract = DocumentTextExtract(), *,
+                lib_digitalized: LibDigitalized = LibDigitalized.GENERIC,
+                filters: FilterText = None,
+            ):
+        super().__init__()
+        self.lib_digitalized: LibDigitalized = lib_digitalized
+        self.extractor: DocumentTextExtract = extractor
+        self.filters = filters
+
+    def get_new_image_name(self, file: DiskFile) -> KeyWordsFileNames:
+        __dynamic = DynamicFile(file)
+        __kw = self.__get_new_name(self.extractor.read_image(file))
+        if __kw.src_dynamic_file is None:
+            __kw[KeyFiles.SRC_FILE_PATH] = __dynamic
+        return __kw
+
+    def get_new_document_name(self, file: DiskFile, *, dpi: int = 200) -> KeyWordsFileNames:
+        __dynamic = DynamicFile(file)
+        __tb = self.extractor.read_document(file, dpi=dpi)
+        __kw = self.__get_new_name(__tb)
+        __kw[KeyFiles.SRC_FILE_PATH] = __dynamic
+        if __kw.file_type is None:
+            __kw.file_type = '.pdf'
+        return __kw
+
+    def __get_new_name(self, tb: TableDocuments) -> KeyWordsFileNames:
+        key_words = KeyWordsFileNames()
+        _doc: DigitalizedDocument
+        if self.lib_digitalized == LibDigitalized.GENERIC:
+            _doc = GenericDocument(tb, filters=self.filters)
+        elif self.lib_digitalized == LibDigitalized.CARTA_CALCULO:
+            _doc = CartaCalculo.create(tb)
+        elif self.lib_digitalized == LibDigitalized.EPI:
+            _doc = FichaEpi.create(tb)
+        else:
+            raise InvalidTDigitalizedDocument(f'{__class__.__name__} Documento inválido: {self.lib_digitalized}')
+
+        filename = _doc.get_output_filename()
+        if filename is not None:
+            key_words[KeyFiles.NEW_FILE_NAME] = filename
+            key_words[KeyFiles.FILE_TYPE] = _doc.extension_file
+        return key_words
 
 
 class ExtractName(Observer):
@@ -263,3 +310,4 @@ class ExtractNameInnerData(ExtractName):
                 GenericDocument(current_tb, filters=None)
             )
             move_path_files(mv_items, replace=False)
+

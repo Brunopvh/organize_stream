@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 from typing import Callable, Optional
+from io import BytesIO
 from organize_stream.utils import (
     sheet, ocr, cs, sp
 )
 from organize_stream.type_utils import (
-    Table as TableDocuments, IterTable, TableRow, NotifyProvider, TextProgress
+    Table as TableDocuments, IterTable, TableRow, NotifyProvider, TextProgress,
+    DiskFile, KeyFiles, KeyWordsFileNames,
 )
 from organize_stream.read import read_image, read_document, Ocr, concat_tables
 import pandas as pd
@@ -162,3 +164,23 @@ class DocumentTextExtract(NotifyProvider):
             self.to_data().to_excel(file.absolute(), index=False)
         except Exception as e:
             print(f'Error: {e}')
+
+    def read_image(self, image: DiskFile) -> TableDocuments:
+        img = cs.ImageObject(image)
+        return self._func_read_image(img, self.recognize)
+
+    def read_document(self, document: DiskFile, *, dpi: int = 200) -> TableDocuments:
+        if isinstance(document, cs.DocumentPdf):
+            pass
+        elif isinstance(document, bytes):
+            document = cs.DocumentPdf.create_from_bytes(BytesIO(document))
+        else:
+            document = cs.DocumentPdf(document)
+        return read_document(
+            document,
+            self.recognize,
+            dpi=dpi,
+            func_read_image=self._func_read_image
+        )
+
+

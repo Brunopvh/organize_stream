@@ -139,9 +139,9 @@ class CartaCalculo(DigitalizedDocument):
             return None
         line_key = fmt_str_file(line_key)
         extension_file = self.extension_file
-        if extension_file is None:
-            return None
-        return f'{line_key}{extension_file}'
+        if extension_file is not None:
+            return f'{line_key}{extension_file}'
+        return line_key
 
 
 class GenericDocument(DigitalizedDocument):

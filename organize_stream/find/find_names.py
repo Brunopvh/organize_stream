@@ -2,8 +2,12 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import pandas as pd
-from organize_stream.type_utils import DigitalizedDocument, OriginFileName, DestFileName
-from organize_stream.type_utils.digital_doc import FilterData
+from organize_stream.type_utils import (
+    DigitalizedDocument, OriginFileName, DestFileName, DiskFile,
+    FilterData, FilterText, KeyFiles, KeyWordsFileNames,
+
+)
+
 from organize_stream.utils import (
     ArrayString, ListString, ListColumnBody, ColumnsTable,
     sp, cs, fmt_str_file, HeadValues, HeadCell,
@@ -130,23 +134,6 @@ class SearchableText(object):
         s = cls()
         s.elements = cs.DictTextTable(_values)
         return s
-
-
-class NameFileInnerTable(object):
-
-    def __init__(self):
-        super().__init__()
-
-    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFileName]:
-        src_file = digitalized.file_path_origin
-        filename = digitalized.get_output_filename()
-        if (src_file is None) or (filename is None):
-            return {}
-        if filename == '':
-            return {}
-        output_path = self.output_dir.join_file(filename)
-        return {OriginFileName(src_file.absolute()): DestFileName(output_path.absolute())}
-
 
 
 class NameFinder(ABC):
