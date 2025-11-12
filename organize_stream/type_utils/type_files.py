@@ -51,11 +51,10 @@ class DynamicFile(object):
 
 class KeyFiles(StrEnum):
 
-    SRC_FILE_PATH = 'FILE_PATH'
+    SRC_FILE_PATH = 'SRC_FILE_PATH'
     SRC_FILENAME = 'FILE_NAME'
     DIRECTORY = 'DIRECTORY'
     FILE_TYPE = 'FILE_TYPE'
-    ORIGIN_DISK_TYPE = 'ORIGIN_DISK_TYPE'
     NEW_FILE_NAME = 'NEW_FILE_NAME'
     UNIQUE_KEY = 'UNIQUE_KEY'
 
@@ -68,28 +67,31 @@ class KeyWordsFileNames(dict):
         self[KeyFiles.SRC_FILENAME.value] = None
         self[KeyFiles.DIRECTORY.value] = None
         self[KeyFiles.FILE_TYPE.value] = None
-        self[KeyFiles.ORIGIN_DISK_TYPE.value] = None
         self[KeyFiles.NEW_FILE_NAME.value] = None
         self[KeyFiles.UNIQUE_KEY.value] = None
-
-    @property
-    def origin_disk_type(self) -> str | None:
-        return self[KeyFiles.ORIGIN_DISK_TYPE]
 
     @property
     def src_dynamic_file(self) -> DynamicFile | None:
         return self[KeyFiles.SRC_FILE_PATH.value]
 
+    @src_dynamic_file.setter
+    def src_dynamic_file(self, value: DynamicFile | None) -> None:
+        self[KeyFiles.SRC_FILE_PATH.value] = value
+
     @property
     def new_file_name(self) -> str | None:
         return self[KeyFiles.NEW_FILE_NAME.value]
 
+    @new_file_name.setter
+    def new_file_name(self, value: Union[str, None] | None) -> None:
+        self[KeyFiles.NEW_FILE_NAME.value] = value
+
     @property
-    def file_type(self) -> str | None:
+    def extension_file(self) -> str | None:
         return self[KeyFiles.FILE_TYPE]
 
-    @file_type.setter
-    def file_type(self, new: str):
+    @extension_file.setter
+    def extension_file(self, new: str):
         self[KeyFiles.FILE_TYPE] = new
 
     def __repr__(self):

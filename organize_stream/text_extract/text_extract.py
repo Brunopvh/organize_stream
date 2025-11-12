@@ -165,11 +165,14 @@ class DocumentTextExtract(NotifyProvider):
         except Exception as e:
             print(f'Error: {e}')
 
-    def read_image(self, image: DiskFile) -> TableDocuments:
-        img = cs.ImageObject(image)
-        return self._func_read_image(img, self.recognize)
+    def read_image(self, image: DiskFile | cs.ImageObject) -> TableDocuments:
+        if isinstance(image, cs.ImageObject):
+            pass
+        else:
+            image = cs.ImageObject(image)
+        return self._func_read_image(image, self.recognize)
 
-    def read_document(self, document: DiskFile, *, dpi: int = 200) -> TableDocuments:
+    def read_document(self, document: DiskFile | cs.DocumentPdf, *, dpi: int = 200) -> TableDocuments:
         if isinstance(document, cs.DocumentPdf):
             pass
         elif isinstance(document, bytes):

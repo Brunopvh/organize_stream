@@ -85,20 +85,21 @@ class NameFileInnerTable(object):
         self.extractor: DocumentTextExtract = extractor
         self.filters = filters
 
-    def get_new_image_name(self, file: DiskFile) -> KeyWordsFileNames:
+    def read_image(self, file: DiskFile | cs.ImageObject) -> KeyWordsFileNames:
         __dynamic = DynamicFile(file)
         __kw = self.__get_new_name(self.extractor.read_image(file))
-        if __kw.src_dynamic_file is None:
-            __kw[KeyFiles.SRC_FILE_PATH] = __dynamic
+        if __kw.extension_file is None:
+            __kw.extension_file = '.png'
+        __kw.src_dynamic_file = __dynamic
         return __kw
 
-    def get_new_document_name(self, file: DiskFile, *, dpi: int = 200) -> KeyWordsFileNames:
+    def read_document(self, file: DiskFile | cs.DocumentPdf, *, dpi: int = 200) -> KeyWordsFileNames:
         __dynamic = DynamicFile(file)
         __tb = self.extractor.read_document(file, dpi=dpi)
         __kw = self.__get_new_name(__tb)
-        __kw[KeyFiles.SRC_FILE_PATH] = __dynamic
-        if __kw.file_type is None:
-            __kw.file_type = '.pdf'
+        __kw.src_dynamic_file = __dynamic
+        if __kw.extension_file is None:
+            __kw.extension_file = '.pdf'
         return __kw
 
     def __get_new_name(self, tb: TableDocuments) -> KeyWordsFileNames:
@@ -114,10 +115,57 @@ class NameFileInnerTable(object):
             raise InvalidTDigitalizedDocument(f'{__class__.__name__} Documento inválido: {self.lib_digitalized}')
 
         filename = _doc.get_output_filename()
-        if filename is not None:
-            key_words[KeyFiles.NEW_FILE_NAME] = filename
-            key_words[KeyFiles.FILE_TYPE] = _doc.extension_file
+        if (filename == 'nan') or (filename == ''):
+            key_words.new_file_name = None
+        else:
+            key_words.new_file_name = filename
+
+        if (key_words.extension_file == 'nan') or (key_words.extension_file == ''):
+            key_words.extension_file = None
+        else:
+            key_words.extension_file = _doc.extension_file
         return key_words
+
+    def __save_file(self, key_word_file: KeyWordsFileNames, out_dir: sp.Directory) -> None:
+        if key_word_file.src_dynamic_file is None:
+            return
+        if key_word_file.new_file_name is None:
+            return
+        if key_word_file.extension_file is None:
+            return
+
+        output_path = out_dir.join_file(f'{key_word_file.new_file_name}{key_word_file.extension_file}')
+        print(f'{__class__.__name__} exportando: {output_path.basename()}')
+        if key_word_file.src_dynamic_file.is_bytes:
+            with open(output_path.absolute(), 'wb') as fp:
+                fp.write(key_word_file.src_dynamic_file.file)
+        elif key_word_file.src_dynamic_file.is_bytes_io:
+            key_word_file.src_dynamic_file.file.seek(0)
+            with open(output_path.absolute(), 'wb') as fp:
+                fp.write(key_word_file.src_dynamic_file.file.getvalue())
+        elif key_word_file.src_dynamic_file.is_file:
+            try:
+                shutil.move(key_word_file.src_dynamic_file.file, output_path.absolute())
+            except Exception as e:
+                print(e)
+        elif key_word_file.src_dynamic_file.is_file_path:
+            try:
+                shutil.move(key_word_file.src_dynamic_file.file.absolute(), output_path.absolute())
+            except Exception as e:
+                print(e)
+
+    def rename_image(self, image: DiskFile | cs.ImageObject, output_dir: sp.Directory):
+        __kw_im = self.read_image(image)
+        self.__save_file(__kw_im, output_dir)
+
+    def rename_document(
+                self,
+                document: DiskFile | cs.DocumentPdf,
+                output_dir: sp.Directory, *,
+                dpi: int = 200
+            ) -> None:
+        __kw_pdf = self.read_document(document, dpi=dpi)
+        self.__save_file(__kw_pdf, output_dir)
 
 
 class ExtractName(Observer):
