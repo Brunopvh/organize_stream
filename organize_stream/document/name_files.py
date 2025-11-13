@@ -217,6 +217,7 @@ class NameFileInnerTable(object):
 
                 dest_file_name: str = f'{key_file.output_filename}{key_file.extension_file}'
                 zipf.writestr(dest_file_name, key_file.input_dynamic_file.get_bytes())
+                self.__exported_files[id_file] = True
         zip_buffer.seek(0)
         return zip_buffer
 
@@ -232,6 +233,7 @@ class NameFileInnerTable(object):
 
                 dest_file_name: str = f'{key_file.output_filename}{key_file.extension_file}'
                 zipf.writestr(dest_file_name, key_file.input_dynamic_file.get_bytes())
+                self.__exported_files[id_file] = True
         zip_buffer.seek(0)
         return zip_buffer
 

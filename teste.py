@@ -31,6 +31,8 @@ def test():
     with open(output_zip.absolute(), 'wb') as zipf:
         zipf.write(_bt_zip.getvalue())
 
+    conv = JsonConvert.from_dict(name.get_exported_files())
+    conv.to_json_data().to_file(OUT.join_file('cartas.json'))
 
 def main():
     test()
