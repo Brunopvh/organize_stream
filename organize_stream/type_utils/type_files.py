@@ -48,6 +48,23 @@ class DynamicFile(object):
     def is_file_path(self) -> bool:
         return isinstance(self.file, sp.File)
 
+    def get_bytes(self) -> bytes:
+        if self.is_bytes:
+            return self.file
+        elif self.is_bytes_io:
+            self.file.seek(0)
+            return self.file.getvalue()
+        elif self.is_file:
+            bt: bytes
+            with open(self.file, 'rb') as f:
+                bt = f.read()
+            return bt
+        elif self.is_file_path:
+            bt: bytes
+            with open(self.file.absolute(), 'rb') as f:
+                bt = f.read()
+            return bt
+
 
 class KeyFiles(StrEnum):
 
@@ -59,7 +76,7 @@ class KeyFiles(StrEnum):
     UNIQUE_KEY = 'UNIQUE_KEY'
 
 
-class KeyWordsFileNames(dict):
+class KeyWordsFileName(dict):
 
     def __init__(self):
         super().__init__({})
@@ -71,19 +88,19 @@ class KeyWordsFileNames(dict):
         self[KeyFiles.UNIQUE_KEY.value] = None
 
     @property
-    def src_dynamic_file(self) -> DynamicFile | None:
+    def input_dynamic_file(self) -> DynamicFile | None:
         return self[KeyFiles.SRC_FILE_PATH.value]
 
-    @src_dynamic_file.setter
-    def src_dynamic_file(self, value: DynamicFile | None) -> None:
+    @input_dynamic_file.setter
+    def input_dynamic_file(self, value: bytes | None) -> None:
         self[KeyFiles.SRC_FILE_PATH.value] = value
 
     @property
-    def new_file_name(self) -> str | None:
+    def output_filename(self) -> str | None:
         return self[KeyFiles.NEW_FILE_NAME.value]
 
-    @new_file_name.setter
-    def new_file_name(self, value: Union[str, None] | None) -> None:
+    @output_filename.setter
+    def output_filename(self, value: Union[str, None] | None) -> None:
         self[KeyFiles.NEW_FILE_NAME.value] = value
 
     @property
@@ -99,6 +116,22 @@ class KeyWordsFileNames(dict):
 
     def keys(self) -> list[str]:
         return list(super().keys())
+
+    def save(self, output_dir: sp.Directory) -> bool:
+        if self.extension_file is None:
+            return False
+        if self.output_filename is None:
+            return False
+        output_file = output_dir.join_file(f'{self.output_filename}{self.extension_file}')
+        try:
+            output_dir.mkdir()
+            with open(output_file.absolute(), 'wb') as f:
+                f.write(self.input_dynamic_file.get_bytes())
+        except Exception as e:
+            print(f'{__class__.__name__} Error: {e}')
+            return False
+        else:
+            return True
 
 
 class OriginFileName(sp.File):

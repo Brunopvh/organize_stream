@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+import tempfile
+from typing import Callable, Union
+from io import BytesIO
 from typing import Union
 from organize_stream.type_utils import (
     FilterText, FilterData, DigitalizedDocument, LibDigitalized, Observer,
-    NotifyProvider, KeyFiles, KeyWordsFileNames, DiskFile, DynamicFile,
+    NotifyProvider, KeyFiles, KeyWordsFileName, DiskFile, DynamicFile,
     Table as TableDocuments
 )
 from organize_stream.find import (
@@ -13,8 +16,9 @@ from organize_stream.utils import (sp, cs)
 from organize_stream.read import create_tb_from_names
 from organize_stream.text_extract import DocumentTextExtract
 from organize_stream.cartas import CartaCalculo, GenericDocument, FichaEpi
-from organize_stream.erros import InvalidTDigitalizedDocument
+from organize_stream.erros import InvalidTDigitalizedDocument, InvalidSrcFile
 from sheet_stream import ColumnsTable
+from sheet_stream.type_utils import get_hash_from_bytes
 import shutil
 
 FindItem = Union[str, list[str]]
@@ -72,6 +76,55 @@ def move_path_files(
             print(e)
 
 
+def save_key_word_filename(key_word_file: KeyWordsFileName, out_dir: sp.Directory) -> tuple[str, bool]:
+    if key_word_file.input_dynamic_file is None:
+        raise InvalidSrcFile()
+
+    _id_file: str = None
+    if key_word_file.input_dynamic_file.is_bytes_io or key_word_file.input_dynamic_file.is_bytes:
+        _id_file = get_hash_from_bytes(key_word_file.input_dynamic_file.file)
+    elif key_word_file.input_dynamic_file.is_file:
+        _id_file = key_word_file.input_dynamic_file.file
+    elif key_word_file.input_dynamic_file.is_file_path:
+        _id_file = key_word_file.input_dynamic_file.file.absolute()
+    else:
+        raise InvalidSrcFile()
+
+    if key_word_file.output_filename is None:
+        return (_id_file, False)
+    if key_word_file.extension_file is None:
+        return (_id_file, False)
+
+    out_dir.mkdir()
+    output_path: sp.File = out_dir.join_file(f'{key_word_file.output_filename}{key_word_file.extension_file}')
+    print(f'Exportando: {output_path.basename()}')
+
+    if key_word_file.input_dynamic_file.is_bytes:
+        # Salvar os bytes no disco.
+        with open(output_path.absolute(), 'wb') as fp:
+            fp.write(key_word_file.input_dynamic_file.file)
+    elif key_word_file.input_dynamic_file.is_bytes_io:
+        # Salvar BytesIO() no disco
+        key_word_file.input_dynamic_file.file.seek(0)
+        with open(output_path.absolute(), 'wb') as fp:
+            fp.write(key_word_file.input_dynamic_file.file.getvalue())
+    elif key_word_file.input_dynamic_file.is_file:
+        # Mover o arquivo no disco.
+        try:
+            shutil.move(key_word_file.input_dynamic_file.file, output_path.absolute())
+        except Exception as e:
+            print(e)
+            return (_id_file, False)
+    elif key_word_file.input_dynamic_file.is_file_path:
+        # Mover o arquivo no disco.
+        try:
+            shutil.move(key_word_file.input_dynamic_file.file.absolute(), output_path.absolute())
+        except Exception as e:
+            print(e)
+            return (_id_file, False)
+    return (_id_file, True)
+
+
 class NameFileInnerTable(object):
 
     def __init__(
@@ -79,31 +132,44 @@ class NameFileInnerTable(object):
                 extractor: DocumentTextExtract = DocumentTextExtract(), *,
                 lib_digitalized: LibDigitalized = LibDigitalized.GENERIC,
                 filters: FilterText = None,
+                func_save_file: Callable[[KeyWordsFileName, sp.Directory], tuple[str, bool]] = None,
             ):
         super().__init__()
+        if func_save_file is None:
+            self.func_save_file = save_key_word_filename
+        else:
+            self.func_save_file = func_save_file
         self.lib_digitalized: LibDigitalized = lib_digitalized
         self.extractor: DocumentTextExtract = extractor
         self.filters = filters
+        self.__exported_files: dict[str, bool] = {}
+        self.__temp_dir: sp.Directory = sp.Directory(tempfile.mkdtemp())
 
-    def read_image(self, file: DiskFile | cs.ImageObject) -> KeyWordsFileNames:
+    def clear(self):
+        self.__exported_files.clear()
+
+    def get_exported_files(self) -> dict[str, bool]:
+        return self.__exported_files
+
+    def read_image(self, file: DiskFile | cs.ImageObject) -> KeyWordsFileName:
         __dynamic = DynamicFile(file)
         __kw = self.__get_new_name(self.extractor.read_image(file))
         if __kw.extension_file is None:
             __kw.extension_file = '.png'
-        __kw.src_dynamic_file = __dynamic
+        __kw.input_dynamic_file = __dynamic
         return __kw
 
-    def read_document(self, file: DiskFile | cs.DocumentPdf, *, dpi: int = 200) -> KeyWordsFileNames:
+    def read_document(self, file: DiskFile | cs.DocumentPdf, *, dpi: int = 200) -> KeyWordsFileName:
         __dynamic = DynamicFile(file)
         __tb = self.extractor.read_document(file, dpi=dpi)
         __kw = self.__get_new_name(__tb)
-        __kw.src_dynamic_file = __dynamic
+        __kw.input_dynamic_file = __dynamic
         if __kw.extension_file is None:
             __kw.extension_file = '.pdf'
         return __kw
 
-    def __get_new_name(self, tb: TableDocuments) -> KeyWordsFileNames:
-        key_words = KeyWordsFileNames()
+    def __get_new_name(self, tb: TableDocuments) -> KeyWordsFileName:
+        key_words = KeyWordsFileName()
         _doc: DigitalizedDocument
         if self.lib_digitalized == LibDigitalized.GENERIC:
             _doc = GenericDocument(tb, filters=self.filters)
@@ -116,9 +182,9 @@ class NameFileInnerTable(object):
 
         filename = _doc.get_output_filename()
         if (filename == 'nan') or (filename == ''):
-            key_words.new_file_name = None
+            key_words.output_filename = None
         else:
-            key_words.new_file_name = filename
+            key_words.output_filename = filename
 
         if (key_words.extension_file == 'nan') or (key_words.extension_file == ''):
             key_words.extension_file = None
@@ -126,35 +192,15 @@ class NameFileInnerTable(object):
             key_words.extension_file = _doc.extension_file
         return key_words
 
-    def __save_file(self, key_word_file: KeyWordsFileNames, out_dir: sp.Directory) -> None:
-        if key_word_file.src_dynamic_file is None:
-            return
-        if key_word_file.new_file_name is None:
-            return
-        if key_word_file.extension_file is None:
-            return
-
-        output_path = out_dir.join_file(f'{key_word_file.new_file_name}{key_word_file.extension_file}')
-        print(f'{__class__.__name__} exportando: {output_path.basename()}')
-        if key_word_file.src_dynamic_file.is_bytes:
-            with open(output_path.absolute(), 'wb') as fp:
-                fp.write(key_word_file.src_dynamic_file.file)
-        elif key_word_file.src_dynamic_file.is_bytes_io:
-            key_word_file.src_dynamic_file.file.seek(0)
-            with open(output_path.absolute(), 'wb') as fp:
-                fp.write(key_word_file.src_dynamic_file.file.getvalue())
-        elif key_word_file.src_dynamic_file.is_file:
-            try:
-                shutil.move(key_word_file.src_dynamic_file.file, output_path.absolute())
-            except Exception as e:
-                print(e)
-        elif key_word_file.src_dynamic_file.is_file_path:
-            try:
-                shutil.move(key_word_file.src_dynamic_file.file.absolute(), output_path.absolute())
-            except Exception as e:
-                print(e)
+    def __save_file(self, key_word_file: KeyWordsFileName, out_dir: sp.Directory) -> tuple[str, bool]:
+        _status: tuple[str, bool] = self.func_save_file(key_word_file, out_dir)
+        self.__exported_files[_status[0]] = _status[1]
+        return _status
 
     def rename_image(self, image: DiskFile | cs.ImageObject, output_dir: sp.Directory):
+        """
+        Extrai o texto de uma imagem e renomeia conforme o padrão do documento informado nesse objeto.
+        """
         __kw_im = self.read_image(image)
         self.__save_file(__kw_im, output_dir)
 
@@ -164,8 +210,32 @@ class NameFileInnerTable(object):
                 output_dir: sp.Directory, *,
                 dpi: int = 200
             ) -> None:
+        """
+        Extrai o texto de um PDF e renomeia conforme o padrão do documento informado nesse objeto.
+        """
         __kw_pdf = self.read_document(document, dpi=dpi)
         self.__save_file(__kw_pdf, output_dir)
+
+    def documents_to_zip(
+                self,
+                documents: list[DiskFile] | list[cs.DocumentPdf],
+                output_dir: sp.Directory, *,
+                dpi: int = 200
+            ) -> BytesIO:
+        pass
+
+    def images_to_zip(
+                self,
+                images: list[cs.ImageObject] | list[DiskFile],
+                output_dir: sp.Directory
+            ) -> BytesIO:
+        try:
+            shutil.rmtree(self.__temp_dir.absolute())
+        except Exception as e:
+            print(e)
+        self.__temp_dir.mkdir()
+        for img in images:
+            key_file = self.read_image(img)
 
 
 class ExtractName(Observer):

@@ -7,12 +7,12 @@ import pandas as pd
 import convert_stream as cs
 from sheet_stream import save_data, ReadFileSheet, fmt_col_to_date, LibDate
 from organize_stream.type_utils import (
-    TextProgress, IterTable, Table, TableRow, KeyFiles, KeyWordsFileNames, DynamicFile, DiskFile
+    TextProgress, IterTable, Table, TableRow, KeyFiles, KeyWordsFileName, DynamicFile, DiskFile
 )
 from organize_stream import (
     ExtractNameInnerData, DocumentTextExtract, ExtractNameInnerText, LibDigitalized
 )
-from organize_stream.document.organize_files import NameFileInnerTable, LibDigitalized
+from organize_stream.document.name_files import NameFileInnerTable, LibDigitalized
 
 
 DOW = UserFileSystem().userDownloads

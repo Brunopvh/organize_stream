@@ -3,7 +3,7 @@ from .digital_doc import DigitalizedDocument, FilterText, FilterData
 from .iterator import IterTable, Table, TableRow
 from .type_files import (
     DestFileName, OriginFileName, LibDigitalized, KeyFiles,
-    KeyWordsFileNames, DiskFile, DynamicFile
+    KeyWordsFileName, DiskFile, DynamicFile
 )
 from enum import StrEnum
 from soup_files import File, ProgressBarAdapter

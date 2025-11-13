@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from organize_stream.type_utils import (
     DigitalizedDocument, OriginFileName, DestFileName, DiskFile,
-    FilterData, FilterText, KeyFiles, KeyWordsFileNames,
+    FilterData, FilterText, KeyFiles, KeyWordsFileName,
 
 )
 

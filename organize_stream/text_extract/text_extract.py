@@ -7,7 +7,7 @@ from organize_stream.utils import (
 )
 from organize_stream.type_utils import (
     Table as TableDocuments, IterTable, TableRow, NotifyProvider, TextProgress,
-    DiskFile, KeyFiles, KeyWordsFileNames,
+    DiskFile, KeyFiles, KeyWordsFileName,
 )
 from organize_stream.read import read_image, read_document, Ocr, concat_tables
 import pandas as pd
