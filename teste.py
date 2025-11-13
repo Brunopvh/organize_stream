@@ -13,24 +13,23 @@ from organize_stream import (
     ExtractNameInnerData, DocumentTextExtract, ExtractNameInnerText, LibDigitalized
 )
 from organize_stream.document.name_files import NameFileInnerTable, LibDigitalized
-
+from io import BytesIO
 
 DOW = UserFileSystem().userDownloads
 OUT = DOW.concat('output', create=True)
-#dest = OUT.concat('MOVIDOS', create=True)
-#src_dir = Directory('/mnt/dados/Teste')
+dest = OUT.concat('MOVIDOS', create=True)
+src_dir = Directory('/home/brunoc/Downloads/input')
 
 
 def test():
     output_sheet = OUT.join_file('cartas.xlsx')
-    #extract_name = ExtractNameInnerText(OUT, lib_digitalized=LibDigitalized.CARTA_CALCULO)
-    #files = InputFiles(src_dir).get_files(file_type=LibraryDocs.PDF)[1:3]
+    output_zip = OUT.join_file('cartas.zip')
 
-    file_pdf = File('/mnt/hd_dados/2025-11-03 CARTAS TOI WHATSAPP/OcrCartas/EXTREMA/107 Ago 2024 - 10 Set 2025/Origin/Digitalizado_20250807-2021.pdf')
-    bytes_pdf = file_pdf.path.read_bytes()
+    images = InputFiles(src_dir).get_files(file_type=LibraryDocs.PDF)
     name = NameFileInnerTable(lib_digitalized=LibDigitalized.CARTA_CALCULO)
-
-    name.rename_document(bytes_pdf, OUT)
+    _bt_zip: BytesIO = name.documents_to_zip(images)
+    with open(output_zip.absolute(), 'wb') as zipf:
+        zipf.write(_bt_zip.getvalue())
 
 
 def main():

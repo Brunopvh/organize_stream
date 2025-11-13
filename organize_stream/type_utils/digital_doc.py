@@ -118,8 +118,19 @@ class DigitalizedDocument(ABC):
     def get_lines_keys(self) -> ArrayString:
         return self.tb.get_column(ColumnsTable.TEXT)
 
-    @abstractmethod
     def get_output_filename(self) -> str | None:
+        """Retorna o novo nome do arquivo, incluindo a extensão"""
+        if (self.extension_file is None) or (self.extension_file == '') or (self.extension_file == 'nan'):
+            return None
+        if (self.get_output_name() is None) or (self.get_output_name() == '') or (self.get_output_name() == 'nan'):
+            return None
+        return f'{self.get_output_name()}{self.extension_file}'
+
+    @abstractmethod
+    def get_output_name(self) -> str | None:
+        """
+        Retorna o novo nome do arquivo, sem a extensão
+        """
         pass
 
     def to_excel(self, file: sp.File):

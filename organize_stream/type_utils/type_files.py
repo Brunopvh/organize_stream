@@ -4,6 +4,8 @@ from typing import TypeAlias, Union
 from io import BytesIO
 from organize_stream.utils import sp, sheet, ListString, ListColumnBody
 from organize_stream.erros import InvalidSrcFile
+from sheet_stream.type_utils import get_hash_from_bytes
+import shutil
 
 DiskFile: TypeAlias = Union[str, sp.File, bytes, BytesIO]
 
@@ -15,22 +17,44 @@ class LibDigitalized(StrEnum):
     EPI = 'epi'
 
 
+class KeyFiles(StrEnum):
+
+    SRC_FILE_PATH = 'SRC_FILE_PATH'
+    SRC_FILENAME = 'FILE_NAME'
+    DIRECTORY = 'DIRECTORY'
+    FILE_TYPE = 'FILE_TYPE'
+    NEW_FILE_NAME = 'NEW_FILE_NAME'
+    UNIQUE_KEY = 'UNIQUE_KEY'
+
+
 class DynamicFile(object):
 
     def __init__(self, file: DiskFile):
         if isinstance(file, sp.File):
-            pass
+            self.__src_obj = 'FILE'
         elif isinstance(file, bytes):
-            pass
+            self.__src_obj = 'BYTES'
         elif isinstance(file, BytesIO):
-            pass
+            self.__src_obj = 'BYTES_IO'
         elif isinstance(file, str):
-            pass
+            self.__src_obj = 'STR'
         else:
             raise InvalidSrcFile(
                 f'{__class__.__name__} Arquivo inválido ... {file}, use ... bytes|BytesIO|File|str'
             )
-        self.file = file
+        self.file: DiskFile = file
+
+    @property
+    def id_file(self) -> str | None:
+        if (self.__src_obj == 'BYTES') or (self.__src_obj == 'BYTES_IO'):
+            _id_file = get_hash_from_bytes(self.file)
+        elif self.__src_obj == 'STR':
+            _id_file = self.file
+        elif self.__src_obj == 'FILE':
+            _id_file = self.file.absolute()
+        else:
+            _id_file = None
+        return _id_file
 
     @property
     def is_bytes(self) -> bool:
@@ -66,14 +90,16 @@ class DynamicFile(object):
             return bt
 
 
-class KeyFiles(StrEnum):
+class OriginFileName(sp.File):
 
-    SRC_FILE_PATH = 'SRC_FILE_PATH'
-    SRC_FILENAME = 'FILE_NAME'
-    DIRECTORY = 'DIRECTORY'
-    FILE_TYPE = 'FILE_TYPE'
-    NEW_FILE_NAME = 'NEW_FILE_NAME'
-    UNIQUE_KEY = 'UNIQUE_KEY'
+    def __init__(self, filename: str):
+        super().__init__(filename)
+
+
+class DestFileName(sp.File):
+
+    def __init__(self, filename: str):
+        super().__init__(filename)
 
 
 class KeyWordsFileName(dict):
@@ -117,30 +143,43 @@ class KeyWordsFileName(dict):
     def keys(self) -> list[str]:
         return list(super().keys())
 
-    def save(self, output_dir: sp.Directory) -> bool:
+    def save(self, output_dir: sp.Directory) -> tuple[DynamicFile, DestFileName | None, bool]:
+        """
+            Salva os bytes do arquivo original no novo caminho absoluto gerado.
+        """
         if self.extension_file is None:
-            return False
+            return self.input_dynamic_file, None, False
         if self.output_filename is None:
-            return False
-        output_file = output_dir.join_file(f'{self.output_filename}{self.extension_file}')
+            return self.input_dynamic_file, None, False
+
+        output_file: sp.File = output_dir.join_file(f'{self.output_filename}{self.extension_file}')
         try:
             output_dir.mkdir()
             with open(output_file.absolute(), 'wb') as f:
                 f.write(self.input_dynamic_file.get_bytes())
         except Exception as e:
             print(f'{__class__.__name__} Error: {e}')
-            return False
+            return self.input_dynamic_file, None, False
         else:
-            return True
+            return self.input_dynamic_file, DestFileName(output_file.absolute()), False
 
+    def move(self, output_dir: sp.Directory) -> tuple[DynamicFile, DestFileName | None, bool]:
+        if (not self.input_dynamic_file.is_file) and (not self.input_dynamic_file.is_file_path):
+            return self.input_dynamic_file, None, False
+        if self.extension_file is None:
+            return self.input_dynamic_file, None, False
+        if self.output_filename is None:
+            return self.input_dynamic_file, None, False
 
-class OriginFileName(sp.File):
+        output_file: sp.File = output_dir.join_file(f'{self.output_filename}{self.extension_file}')
+        try:
+            if self.input_dynamic_file.is_file:
+                shutil.move(self.input_dynamic_file.file, output_file.absolute())
+            elif self.input_dynamic_file.is_file_path:
+                shutil.move(self.input_dynamic_file.file.absolute(), output_file.absolute())
+        except Exception as e:
+            print(f'{__class__.__name__} Error: {e}')
+            return self.input_dynamic_file, None, False
+        else:
+            return self.input_dynamic_file, DestFileName(output_file.absolute()), True
 
-    def __init__(self, filename: str):
-        super().__init__(filename)
-
-
-class DestFileName(sp.File):
-
-    def __init__(self, filename: str):
-        super().__init__(filename)

@@ -133,14 +133,11 @@ class CartaCalculo(DigitalizedDocument):
         content.append(self.medidor)
         return content
 
-    def get_output_filename(self) -> str | None:
+    def get_output_name(self) -> str | None:
         line_key = self.get_line_key()
         if (line_key is None) or (line_key == ''):
             return None
         line_key = fmt_str_file(line_key)
-        extension_file = self.extension_file
-        if extension_file is not None:
-            return f'{line_key}{extension_file}'
         return line_key
 
 
@@ -208,17 +205,11 @@ class GenericDocument(DigitalizedDocument):
     def get_line_key(self) -> str:
         pass
 
-    def get_output_filename(self) -> str | None:
+    def get_output_name(self) -> str | None:
         if self.tb.get_column(ColumnsTable.TEXT).length == 0:
             return None
-
         _filename = self._get_value_with_str(self.tb)
-        _extension = self.extension_file
-        if _extension is None:
-            return None
-        if _filename is None:
-            return None
-        return f'{_filename}{_extension}'
+        return _filename
 
 
 class FichaEpi(GenericDocument):
@@ -250,6 +241,16 @@ class FichaEpi(GenericDocument):
             filename = f'{filename}-{line_date}'
         filename = fmt_str_file(filename)
         return f'{filename}{_extension}'
+
+    def get_output_name(self) -> str | None:
+        line_date = self.get_date_doc()
+        filename = self.get_nome()
+
+        if filename is None:
+            return None
+        if line_date is not None:
+            filename = f'{filename}-{line_date}'
+        return fmt_str_file(filename)
 
     def get_nome(self) -> str | None:
         return self.tb.get_column(ColumnsTable.TEXT).get_next_string('MATR')

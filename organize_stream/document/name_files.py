@@ -6,7 +6,7 @@ from io import BytesIO
 from typing import Union
 from organize_stream.type_utils import (
     FilterText, FilterData, DigitalizedDocument, LibDigitalized, Observer,
-    NotifyProvider, KeyFiles, KeyWordsFileName, DiskFile, DynamicFile,
+    NotifyProvider, KeyFiles, KeyWordsFileName, DiskFile, DynamicFile, DestFileName,
     Table as TableDocuments
 )
 from organize_stream.find import (
@@ -20,6 +20,7 @@ from organize_stream.erros import InvalidTDigitalizedDocument, InvalidSrcFile
 from sheet_stream import ColumnsTable
 from sheet_stream.type_utils import get_hash_from_bytes
 import shutil
+import zipfile
 
 FindItem = Union[str, list[str]]
 
@@ -76,53 +77,37 @@ def move_path_files(
             print(e)
 
 
-def save_key_word_filename(key_word_file: KeyWordsFileName, out_dir: sp.Directory) -> tuple[str, bool]:
+def save_key_word_filename(
+            key_word_file: KeyWordsFileName,
+            out_dir: sp.Directory
+        ) -> tuple[DynamicFile, DestFileName | None, bool]:
+    """
+    Salva o arquivo nomeado no disco e retorna uma tupla do arquivo original apontando para booleano.
+
+    @rtype: tuple[str, bool]
+    @type key_word_file: KeyWordsFileName
+    @type out_dir: sp.Directory
+
+    :rtype: Tuple[str, bool] ID o arquivo de origem, podendo ser o caminho absoluto ou a hash md5 dos bytes.
+    :param out_dir: Diretório onde o arquivo de saída será gravado.
+    :param key_word_file: Objeto/dicionário com os dados dos arquivos de origem e destino.
+    """
     if key_word_file.input_dynamic_file is None:
         raise InvalidSrcFile()
 
-    _id_file: str = None
-    if key_word_file.input_dynamic_file.is_bytes_io or key_word_file.input_dynamic_file.is_bytes:
-        _id_file = get_hash_from_bytes(key_word_file.input_dynamic_file.file)
-    elif key_word_file.input_dynamic_file.is_file:
-        _id_file = key_word_file.input_dynamic_file.file
-    elif key_word_file.input_dynamic_file.is_file_path:
-        _id_file = key_word_file.input_dynamic_file.file.absolute()
-    else:
-        raise InvalidSrcFile()
-
     if key_word_file.output_filename is None:
-        return (_id_file, False)
+        return key_word_file.input_dynamic_file, None, False
     if key_word_file.extension_file is None:
-        return (_id_file, False)
+        return key_word_file.input_dynamic_file, None, False
 
     out_dir.mkdir()
-    output_path: sp.File = out_dir.join_file(f'{key_word_file.output_filename}{key_word_file.extension_file}')
-    print(f'Exportando: {output_path.basename()}')
-
-    if key_word_file.input_dynamic_file.is_bytes:
+    if key_word_file.input_dynamic_file.is_bytes or key_word_file.input_dynamic_file.is_bytes_io:
         # Salvar os bytes no disco.
-        with open(output_path.absolute(), 'wb') as fp:
-            fp.write(key_word_file.input_dynamic_file.file)
-    elif key_word_file.input_dynamic_file.is_bytes_io:
-        # Salvar BytesIO() no disco
-        key_word_file.input_dynamic_file.file.seek(0)
-        with open(output_path.absolute(), 'wb') as fp:
-            fp.write(key_word_file.input_dynamic_file.file.getvalue())
-    elif key_word_file.input_dynamic_file.is_file:
+        return key_word_file.save(out_dir)
+    elif key_word_file.input_dynamic_file.is_file or key_word_file.input_dynamic_file.is_file_path:
         # Mover o arquivo no disco.
-        try:
-            shutil.move(key_word_file.input_dynamic_file.file, output_path.absolute())
-        except Exception as e:
-            print(e)
-            return (_id_file, False)
-    elif key_word_file.input_dynamic_file.is_file_path:
-        # Mover o arquivo no disco.
-        try:
-            shutil.move(key_word_file.input_dynamic_file.file.absolute(), output_path.absolute())
-        except Exception as e:
-            print(e)
-            return (_id_file, False)
-    return (_id_file, True)
+        return key_word_file.move(out_dir)
+    return key_word_file.input_dynamic_file, None, False
 
 
 class NameFileInnerTable(object):
@@ -132,7 +117,9 @@ class NameFileInnerTable(object):
                 extractor: DocumentTextExtract = DocumentTextExtract(), *,
                 lib_digitalized: LibDigitalized = LibDigitalized.GENERIC,
                 filters: FilterText = None,
-                func_save_file: Callable[[KeyWordsFileName, sp.Directory], tuple[str, bool]] = None,
+                func_save_file: Callable[
+                    [KeyWordsFileName, sp.Directory], tuple[DynamicFile, DestFileName | None, bool]
+                ] = None,
             ):
         super().__init__()
         if func_save_file is None:
@@ -193,9 +180,9 @@ class NameFileInnerTable(object):
         return key_words
 
     def __save_file(self, key_word_file: KeyWordsFileName, out_dir: sp.Directory) -> tuple[str, bool]:
-        _status: tuple[str, bool] = self.func_save_file(key_word_file, out_dir)
-        self.__exported_files[_status[0]] = _status[1]
-        return _status
+        _status: tuple[DynamicFile, DestFileName, bool] = self.func_save_file(key_word_file, out_dir)
+        self.__exported_files[_status[0].id_file] = _status[2]
+        return _status[0].id_file, _status[2]
 
     def rename_image(self, image: DiskFile | cs.ImageObject, output_dir: sp.Directory):
         """
@@ -217,25 +204,36 @@ class NameFileInnerTable(object):
         self.__save_file(__kw_pdf, output_dir)
 
     def documents_to_zip(
-                self,
-                documents: list[DiskFile] | list[cs.DocumentPdf],
-                output_dir: sp.Directory, *,
-                dpi: int = 200
+                self, documents: list[DiskFile] | list[cs.DocumentPdf], dpi: int = 200
             ) -> BytesIO:
-        pass
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zipf:
+            for pdf_doc in documents:
+                key_file: KeyWordsFileName = self.read_document(pdf_doc, dpi=dpi)
+                id_file = key_file.input_dynamic_file.id_file
+                if (key_file.extension_file is None) or (key_file.output_filename is None):
+                    self.__exported_files[id_file] = False
+                    continue
 
-    def images_to_zip(
-                self,
-                images: list[cs.ImageObject] | list[DiskFile],
-                output_dir: sp.Directory
-            ) -> BytesIO:
-        try:
-            shutil.rmtree(self.__temp_dir.absolute())
-        except Exception as e:
-            print(e)
-        self.__temp_dir.mkdir()
-        for img in images:
-            key_file = self.read_image(img)
+                dest_file_name: str = f'{key_file.output_filename}{key_file.extension_file}'
+                zipf.writestr(dest_file_name, key_file.input_dynamic_file.get_bytes())
+        zip_buffer.seek(0)
+        return zip_buffer
+
+    def images_to_zip(self, images: list[cs.ImageObject] | list[DiskFile]) -> BytesIO:
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zipf:
+            for img in images:
+                key_file: KeyWordsFileName = self.read_image(img)
+                id_file = key_file.input_dynamic_file.id_file
+                if (key_file.extension_file is None) or (key_file.output_filename is None):
+                    self.__exported_files[id_file] = False
+                    continue
+
+                dest_file_name: str = f'{key_file.output_filename}{key_file.extension_file}'
+                zipf.writestr(dest_file_name, key_file.input_dynamic_file.get_bytes())
+        zip_buffer.seek(0)
+        return zip_buffer
 
 
 class ExtractName(Observer):
