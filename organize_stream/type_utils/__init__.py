@@ -2,7 +2,7 @@ from .observer import (
     Observer, NotifyProvider, ObserverTableExtraction, NotifyTableExtract
 )
 from .digital_doc import DigitalizedDocument, FilterText, FilterData
-from .type_files import (
+from .keyword_files import (
     DestFilePath, OriginFileName, LibDigitalized, KeyFiles,
     KeyWordsFileName, DiskFile, DynamicFile
 )

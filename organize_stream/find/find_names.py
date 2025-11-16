@@ -3,14 +3,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import pandas as pd
 from organize_stream.type_utils import (
-    DigitalizedDocument, OriginFileName, DestFilePath, DiskFile,
-    FilterData, FilterText, KeyFiles, KeyWordsFileName,
+    DigitalizedDocument, OriginFileName, DestFilePath,
+    FilterData,
 
 )
 
 from organize_stream.utils import (
     ArrayString, ListString, ListColumnBody, ColumnsTable,
-    sp, cs, fmt_str_file, HeadValues, HeadCell,
+    sp, fmt_str_file, HeadValues, HeadCell, sheet
 )
 
 
@@ -25,11 +25,11 @@ def get_column_values(df: pd.DataFrame, col: str) -> ArrayString:
 
 
 class SearchableText(object):
-    default_elements: cs.DictTextTable = cs.DictTextTable.create_void_dict()
+    default_elements: sheet.TableDocuments = sheet.TableDocuments.create_void_dict()
     default_columns: HeadValues = HeadValues([HeadCell(x) for x in list(default_elements.keys())])
 
     def __init__(self):
-        self.elements: cs.DictTextTable = cs.DictTextTable.create_void_dict()
+        self.elements: sheet.TableDocuments = sheet.TableDocuments.create_void_dict()
 
     def __repr__(self):
         return f'SearchableText\nHead: {self.head}\nBody: {self.body}'
@@ -132,7 +132,7 @@ class SearchableText(object):
                 )
             )
         s = cls()
-        s.elements = cs.DictTextTable(_values)
+        s.elements = sheet.TableDocuments(_values)
         return s
 
 

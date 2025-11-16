@@ -135,6 +135,7 @@ class NameFileInnerTable(object):
             self.func_save_file = func_save_file
         self.lib_digitalized: LibDigitalized = lib_digitalized
         self.extractor: DocumentTextExtract = extractor
+        self.extractor.apply_threshold = True
         self.filters = filters
         # Dicionário para gravar o status de exportação dos arquivos,
         # sendo que as chaves apontam para o arquivo de origem DynamicFile() e
@@ -265,22 +266,21 @@ class NameFileInnerTable(object):
             self._save_file_keyword(__k, output_dir)
 
     def export_log_actions(self) -> pd.DataFrame:
-        __df = pd.DataFrame()
-        __files = []
-        __dest = []
-        __status = []
+        __data: dict[str, list[str]] = {
+            'ARQUIVO': [],
+            'DESTINO': [],
+            'STATUS': [],
+        }
         __key: DynamicFile
         current: tuple[str | None, bool]
         for __key in self.__exported_files.keys():
             current = self.__exported_files[__key]
             if __key is not None:
-                __files.append(__key)
-                __dest.append(current[0])
-                __status.append(current[1])
-        __df['ARQUIVO'] = __files
-        __df['DESTINO'] = __dest
-        __df['STATUS'] = __status
-        return __df.astype('str')
+                __data['ARQUIVO'].append(__key.id_file)
+                __data['DESTINO'].append(current[0])
+                __data['STATUS'].append("FALHA" if not current[1] else "SUCESSO")
+        __df = pd.DataFrame(__data)
+        return __df
 
     def export_keys_to_zip(self) -> BytesIO | None:
         if self.__list_key_files.length == 0:
