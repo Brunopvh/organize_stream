@@ -27,7 +27,7 @@ def test():
 
     images = InputFiles(src_dir).get_files(file_type=LibraryDocs.PDF)
     name = NameFileInnerTable(lib_digitalized=LibDigitalized.CARTA_CALCULO)
-    _bt_zip: BytesIO = name.documents_to_zip(images)
+    _bt_zip: BytesIO = name.export_keys_to_zip(images)
     with open(output_zip.absolute(), 'wb') as zipf:
         zipf.write(_bt_zip.getvalue())
 

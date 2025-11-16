@@ -1,8 +1,9 @@
-from .observer import Observer, NotifyProvider
+from .observer import (
+    Observer, NotifyProvider, ObserverTableExtraction, NotifyTableExtract
+)
 from .digital_doc import DigitalizedDocument, FilterText, FilterData
-from .iterator import IterTable, Table, TableRow
 from .type_files import (
-    DestFileName, OriginFileName, LibDigitalized, KeyFiles,
+    DestFilePath, OriginFileName, LibDigitalized, KeyFiles,
     KeyWordsFileName, DiskFile, DynamicFile
 )
 from enum import StrEnum
@@ -53,7 +54,8 @@ class TextProgress(object):
 __all__ = [
     'DigitalizedDocument', 'FilterText', 'Observer',
     'NotifyProvider', 'LibDigitalized', 'FilterData',
-    'OriginFileName', 'DestFileName', 'TextProgress',
-    'IterTable', 'Table', 'TableRow',
+    'OriginFileName', 'DestFilePath', 'TextProgress',
+    'NotifyTableExtract', 'ObserverTableExtraction',
+    'KeyFiles', 'KeyWordsFileName', 'DiskFile', 'DynamicFile',
 ]
 

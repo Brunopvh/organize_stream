@@ -10,7 +10,7 @@ from .read import (
 )
 from .find import (
     SearchableText, NameFinderInnerText, NameFinderInnerData, NameFinder,
-    OriginFileName, DestFileName
+    OriginFileName, DestFilePath
 )
 from .text_extract import DocumentTextExtract
 from .document import (

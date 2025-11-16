@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-from io import BytesIO
 from typing import Callable, Optional
 from organize_stream.utils import (
-    cs, sp, sheet, ocr, HeadValues, ListColumnBody, HeadCell, ListString, ColumnsTable,
+    cs, sp, sheet, ocr, HeadValues, ListColumnBody, HeadCell, ListString,
+    ColumnsTable, TableDocuments,
 )
-from organize_stream.type_utils import TextProgress, Table as TableDocuments
 
 
-class Ocr(ocr.RecognizeImage):
+class OcrImage(ocr.RecognizeImage):
     """
     Singleton para reconhecimento de texto em imagens
     """
@@ -17,7 +16,7 @@ class Ocr(ocr.RecognizeImage):
     def __new__(cls):
         if cls._instance is None:
             # Cria a instância uma única vez
-            cls._instance = super(Ocr, cls).__new__(cls)
+            cls._instance = super(OcrImage, cls).__new__(cls)
         return cls._instance
 
     def __init__(
@@ -72,10 +71,10 @@ def create_table_from_dict(data: dict[str, sheet.ListColumnBody]) -> sheet.Table
     return sheet.TableDocuments(_values)
 
 
-def create_tb_from_names(files: list[sp.File]) -> list[cs.DictTextTable]:
-    values: list[cs.DictTextTable] = []
+def create_tb_from_names(files: list[sp.File]) -> list[TableDocuments]:
+    values: list[TableDocuments] = []
     for f in files:
-        tb = cs.DictTextTable.create_void_dict()
+        tb = TableDocuments.create_void_dict()
         tb[sheet.ColumnsTable.TEXT.value].append(f.name())
         tb[sheet.ColumnsTable.FILETYPE.value].append(f.extension())
         tb[sheet.ColumnsTable.FILE_PATH.value].append(f.absolute())
@@ -88,7 +87,7 @@ def create_tb_from_names(files: list[sp.File]) -> list[cs.DictTextTable]:
     return values
 
 
-def read_image(img: cs.ImageObject, recognize: ocr.RecognizeImage = Ocr()) -> TableDocuments:
+def read_image(img: cs.ImageObject, recognize: ocr.RecognizeImage = OcrImage()) -> TableDocuments:
     txt_image = recognize.image_to_string(img)
     try:
         tb = TableDocuments.create_from_values(
@@ -108,7 +107,7 @@ def read_image(img: cs.ImageObject, recognize: ocr.RecognizeImage = Ocr()) -> Ta
 
 def read_document(
             document: cs.DocumentPdf,
-            recognize: ocr.RecognizeImage = Ocr(), *,
+            recognize: ocr.RecognizeImage = OcrImage(), *,
             pbar: sp.ProgressBarAdapter = sp.ProgressBarAdapter(),
             dpi: int = 200,
             func_read_image: Callable[[cs.ImageObject, Optional[ocr.RecognizeImage]], TableDocuments] = None,
@@ -120,16 +119,16 @@ def read_document(
     if func_read_image is None:
         func_read_image = read_image
     list_tables: list[TableDocuments] = []
-    text_progress = TextProgress()
-    text_progress.set_pbar(pbar)
+    text_progress = sp.TextProgress()
+    text_progress.pbar = pbar
     text_progress.start_pbar()
-    text_progress.get_pbar().update(0, 'Iniciando a extração da tabela PDF')
+    text_progress.pbar.update(0, 'Iniciando a extração da tabela PDF')
 
     convert = cs.ConvertPdfToImages.create(document)
     convert.set_pbar(pbar)
     images: list[cs.ImageObject] = convert.to_images(dpi=dpi)
     text_progress.total = len(images)
-    text_progress.set_default_text('OCR PDF')
+    text_progress.text = 'OCR PDF'
 
     for page_pdf_idx, img in enumerate(images):
         text_progress.set_update()
@@ -142,7 +141,7 @@ def read_document(
                 current_tb, name=sheet.ColumnsTable.NUM_PAGE, new_value=f'{page_pdf_idx+1}'
             )
             list_tables.append(current_tb)
-    text_progress.get_pbar().update(100, 'Extração finalizada!')
+    text_progress.pbar.update(100, 'Extração finalizada!')
     text_progress.stop_pbar()
     return concat_tables(list_tables)
 

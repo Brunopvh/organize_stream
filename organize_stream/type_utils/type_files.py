@@ -72,6 +72,9 @@ class DynamicFile(object):
     def is_file_path(self) -> bool:
         return isinstance(self.file, sp.File)
 
+    def __hash__(self):
+        return hash(self.file)
+
     def get_bytes(self) -> bytes:
         if self.is_bytes:
             return self.file
@@ -88,6 +91,7 @@ class DynamicFile(object):
             with open(self.file.absolute(), 'rb') as f:
                 bt = f.read()
             return bt
+        return None
 
 
 class OriginFileName(sp.File):
@@ -96,13 +100,20 @@ class OriginFileName(sp.File):
         super().__init__(filename)
 
 
-class DestFileName(sp.File):
+class DestFilePath(sp.File):
 
     def __init__(self, filename: str):
         super().__init__(filename)
 
 
 class KeyWordsFileName(dict):
+    """
+        Dicionário que contém informações de um arquivo no disco, bytes|BytesIO|File|str.
+    A chave KeyFiles.NEW_FILE_NAME.value - pode ser definida futuramente para guardar o
+    novo nome do arquivo (bastando concatenar com o diretório de saída para obter o caminho
+    absoluto do novo arquivo).
+
+    """
 
     def __init__(self):
         super().__init__({})
@@ -118,15 +129,17 @@ class KeyWordsFileName(dict):
         return self[KeyFiles.SRC_FILE_PATH.value]
 
     @input_dynamic_file.setter
-    def input_dynamic_file(self, value: bytes | None) -> None:
+    def input_dynamic_file(self, value: DynamicFile) -> None:
+        if not isinstance(value, DynamicFile):
+            raise TypeError(f'{__class__.__name__} Use: DynamicFile()')
         self[KeyFiles.SRC_FILE_PATH.value] = value
 
     @property
-    def output_filename(self) -> str | None:
+    def output_name_str(self) -> str | None:
         return self[KeyFiles.NEW_FILE_NAME.value]
 
-    @output_filename.setter
-    def output_filename(self, value: Union[str, None] | None) -> None:
+    @output_name_str.setter
+    def output_name_str(self, value: Union[str, None] | None) -> None:
         self[KeyFiles.NEW_FILE_NAME.value] = value
 
     @property
@@ -140,20 +153,38 @@ class KeyWordsFileName(dict):
     def __repr__(self):
         return f'KeyWordsFileNames: {super().__repr__()}'
 
-    def keys(self) -> list[str]:
-        return list(super().keys())
+    def __hash__(self):
+        return hash(self.input_dynamic_file.file)
 
-    def save(self, output_dir: sp.Directory) -> tuple[DynamicFile, DestFileName | None, bool]:
+    def __eq__(self, other):
+        if self.input_dynamic_file is not None and other.input_dynamic_file is not None:
+            return self.input_dynamic_file.file == other.input_dynamic_file.file
+        return self.__hash__() == other.__hash__()
+
+    def keys(self) -> ListString:
+        return ListString(list(super().keys()))
+
+    def save(self, output_dir: sp.Directory) -> tuple[DynamicFile, DestFilePath | None, bool]:
         """
             Salva os bytes do arquivo original no novo caminho absoluto gerado.
+
+        :param output_dir: Diretório para concatenar com o nome do novo arquivo
+        (chave: KeyFiles.NEW_FILE_NAME.value).
+
+        :return: Tuple (DynamicFile, DestFileName | None, bool).
+        Se a operação falhar o terceiro elemento da tuple será False, se não, será True.
+        tuple[0] -> DynamicFile arquivo original
+        tuple[1] -> DestFileName caminho absoluto do arquivo salvo no disco ou None se a operação falhar.
+        tuple[2] -> bool sucesso ou erro.
+
         """
         if self.extension_file is None:
             return self.input_dynamic_file, None, False
-        if self.output_filename is None:
+        if self.output_name_str is None:
             return self.input_dynamic_file, None, False
 
-        output_file: sp.File = output_dir.join_file(f'{self.output_filename}{self.extension_file}')
         try:
+            output_file: sp.File = output_dir.join_file(f'{self.output_name_str}{self.extension_file}')
             output_dir.mkdir()
             with open(output_file.absolute(), 'wb') as f:
                 f.write(self.input_dynamic_file.get_bytes())
@@ -161,17 +192,17 @@ class KeyWordsFileName(dict):
             print(f'{__class__.__name__} Error: {e}')
             return self.input_dynamic_file, None, False
         else:
-            return self.input_dynamic_file, DestFileName(output_file.absolute()), False
+            return self.input_dynamic_file, DestFilePath(output_file.absolute()), False
 
-    def move(self, output_dir: sp.Directory) -> tuple[DynamicFile, DestFileName | None, bool]:
+    def move(self, output_dir: sp.Directory) -> tuple[DynamicFile, DestFilePath | None, bool]:
         if (not self.input_dynamic_file.is_file) and (not self.input_dynamic_file.is_file_path):
             return self.input_dynamic_file, None, False
         if self.extension_file is None:
             return self.input_dynamic_file, None, False
-        if self.output_filename is None:
+        if self.output_name_str is None:
             return self.input_dynamic_file, None, False
 
-        output_file: sp.File = output_dir.join_file(f'{self.output_filename}{self.extension_file}')
+        output_file: sp.File = output_dir.join_file(f'{self.output_name_str}{self.extension_file}')
         try:
             if self.input_dynamic_file.is_file:
                 shutil.move(self.input_dynamic_file.file, output_file.absolute())
@@ -181,5 +212,5 @@ class KeyWordsFileName(dict):
             print(f'{__class__.__name__} Error: {e}')
             return self.input_dynamic_file, None, False
         else:
-            return self.input_dynamic_file, DestFileName(output_file.absolute()), True
+            return self.input_dynamic_file, DestFilePath(output_file.absolute()), True
 

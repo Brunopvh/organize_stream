@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import pandas as pd
 from organize_stream.type_utils import (
-    DigitalizedDocument, OriginFileName, DestFileName, DiskFile,
+    DigitalizedDocument, OriginFileName, DestFilePath, DiskFile,
     FilterData, FilterText, KeyFiles, KeyWordsFileName,
 
 )
@@ -142,7 +142,7 @@ class NameFinder(ABC):
         self.output_dir = output_dir
 
     @abstractmethod
-    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFileName]:
+    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFilePath]:
         pass
 
 
@@ -151,15 +151,15 @@ class NameFinderInnerText(NameFinder):
     def __init__(self, output_dir: sp.Directory):
         super().__init__(output_dir)
 
-    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFileName]:
+    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFilePath]:
         src_file = digitalized.file_path_origin
-        filename = digitalized.get_output_filename()
+        filename = digitalized.get_output_name_with_extension()
         if (src_file is None) or (filename is None):
             return {}
         if filename == '':
             return {}
         output_path = self.output_dir.join_file(filename)
-        return {OriginFileName(src_file.absolute()): DestFileName(output_path.absolute())}
+        return {OriginFileName(src_file.absolute()): DestFilePath(output_path.absolute())}
 
 
 class NameFinderInnerData(NameFinder):
@@ -194,7 +194,7 @@ class NameFinderInnerData(NameFinder):
             new_name = f'{new_name}-{i}'
         return new_name
 
-    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFileName]:
+    def get_new_name(self, digitalized: DigitalizedDocument) -> dict[OriginFileName, DestFilePath]:
         extension_file = digitalized.extension_file
         _origin_path = digitalized.file_path_origin
         if (extension_file is None) or (_origin_path is None):
@@ -237,4 +237,4 @@ class NameFinderInnerData(NameFinder):
             return {}
         if not isinstance(_origin_path, sp.File):
             return {}
-        return {OriginFileName(_origin_path.absolute()): DestFileName(_dest_path.absolute())}
+        return {OriginFileName(_origin_path.absolute()): DestFilePath(_dest_path.absolute())}

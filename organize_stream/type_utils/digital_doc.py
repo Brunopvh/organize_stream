@@ -118,16 +118,16 @@ class DigitalizedDocument(ABC):
     def get_lines_keys(self) -> ArrayString:
         return self.tb.get_column(ColumnsTable.TEXT)
 
-    def get_output_filename(self) -> str | None:
+    def get_output_name_with_extension(self) -> str | None:
         """Retorna o novo nome do arquivo, incluindo a extensão"""
         if (self.extension_file is None) or (self.extension_file == '') or (self.extension_file == 'nan'):
             return None
-        if (self.get_output_name() is None) or (self.get_output_name() == '') or (self.get_output_name() == 'nan'):
+        if (self.get_output_name_str() is None) or (self.get_output_name_str() == '') or (self.get_output_name_str() == 'nan'):
             return None
-        return f'{self.get_output_name()}{self.extension_file}'
+        return f'{self.get_output_name_str()}{self.extension_file}'
 
     @abstractmethod
-    def get_output_name(self) -> str | None:
+    def get_output_name_str(self) -> str | None:
         """
         Retorna o novo nome do arquivo, sem a extensão
         """
