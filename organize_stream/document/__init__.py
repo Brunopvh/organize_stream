@@ -1,3 +1,3 @@
 from .name_files import (
-    ExtractName, ExtractNameInnerText, ExtractNameInnerData,
+    ExtractNameInnerText, ExtractNameInnerData, NameFileInnerTable
 )

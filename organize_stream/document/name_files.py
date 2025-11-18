@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
+import os.path
 import tempfile
 from typing import Callable, Union
 from io import BytesIO
@@ -267,17 +269,18 @@ class NameFileInnerTable(object):
 
     def export_log_actions(self) -> pd.DataFrame:
         __data: dict[str, list[str]] = {
-            'ARQUIVO': [],
-            'DESTINO': [],
             'STATUS': [],
+            'ARQUIVO_ORIGEM': [],
+            'NOVO_NOME': [],
+
         }
         __key: DynamicFile
         current: tuple[str | None, bool]
         for __key in self.__exported_files.keys():
             current = self.__exported_files[__key]
             if __key is not None:
-                __data['ARQUIVO'].append(__key.id_file)
-                __data['DESTINO'].append(current[0])
+                __data['ARQUIVO'].append(os.path.basename(__key.id_file))
+                __data['DESTINO'].append(os.path.basename(current[0]))
                 __data['STATUS'].append("FALHA" if not current[1] else "SUCESSO")
         __df = pd.DataFrame(__data)
         return __df
