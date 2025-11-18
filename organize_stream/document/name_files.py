@@ -279,9 +279,12 @@ class NameFileInnerTable(object):
         for __key in self.__exported_files.keys():
             current = self.__exported_files[__key]
             if __key is not None:
-                __data['ARQUIVO_ORIGEM'].append(os.path.basename(__key.id_file))
-                __data['NOVO_NOME'].append(os.path.basename(current[0]))
-                __data['STATUS'].append("FALHA" if not current[1] else "SUCESSO")
+                __origin = __key.id_file
+                __dest = current[0]
+                if (__origin is not None) and (__dest is not None):
+                    __data['ARQUIVO_ORIGEM'].append(os.path.basename(__origin))
+                    __data['NOVO_NOME'].append(os.path.basename(__dest))
+                    __data['STATUS'].append("FALHA" if not current[1] else "SUCESSO")
         __df = pd.DataFrame(__data)
         return __df
 
