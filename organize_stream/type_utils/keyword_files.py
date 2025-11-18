@@ -202,7 +202,15 @@ class KeyWordsFileName(dict):
         if self.output_name_str is None:
             return self.input_dynamic_file, None, False
 
+        _count = 0
         output_file: sp.File = output_dir.join_file(f'{self.output_name_str}{self.extension_file}')
+        if output_file.exists():
+            while True:
+                _count += 1
+                output_file: sp.File = output_dir.join_file(f'{self.output_name_str}-{_count}{self.extension_file}')
+                if not output_file.exists():
+                    break
+            
         try:
             if self.input_dynamic_file.is_file:
                 shutil.move(self.input_dynamic_file.file, output_file.absolute())
